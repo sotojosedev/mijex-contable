@@ -20,7 +20,10 @@
 - [ ] T12 Activar en desarrollo o producción y revisar el comparador con datos reales (con confirmación).
 - [ ] T13 Cubrir los asientos sin equivalente (modelo anterior, reajustes `settled:*`).
 - [x] T14a Informes en la librería: `incomeStatement` (contra-ingresos = ingresos de saldo deudor; coste de ventas = grupo `COST_OF_SALES`, dato del plan) y `balanceSheet` (resultado no cerrado en el patrimonio), en bigint; migración 0002 (grupo de la cuenta).
-- [ ] T14b Retirar el mayor de HS y pasar sus pantallas a los informes de la librería; 606/607/608 e IR-17 (*stop condition*).
+- [x] T14b (fase 1, HS spec 040, aprobada por el usuario) HS deja de llevar plan, saldos e informes: Contabilidad lee de la librería (diario paginado con `countEntries` y `sourcePrefix`). `journal_entries` queda como registro transaccional de hechos (outbox) que la librería replica.
+- [x] T14c 606/607/608 en la librería (`src/reports/do/dgii.ts`, R-DO-201…204), con los formatos verificados en las normas (07-2018, 10-2018, 05-2019), los instructivos y las plantillas oficiales. HS solo aporta los datos. Correcciones por norma: 608 con la fecha de anulación; 607 sin el consumo inferior a RD$250.000. El IR-17 sigue en HS (resumen de liquidaciones, sin formato de envío).
+  - [verificar con el asesor o la DGII] e-NCF (13 posiciones) frente al NCF de 11 de la norma, y si los e-CF se siguen remitiendo en 606/607; el 606 de las liquidaciones a técnicos no lleva NCF.
+- [ ] T14d Archivar `ledger_accounts` y el registro de hechos de HS (migración destructiva: aprobación expresa).
 
 ## Siguientes
 Conciliación común (hecha: spec 002), entidades de organizaciones y comunidades (con sus fuentes).

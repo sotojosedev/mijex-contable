@@ -136,9 +136,13 @@ function api(client: PoolClient): LedgerStoreTx {
     },
     async entries(entityId, f) {
       return entriesWithLines(await rows(
-        `SELECT ${ENTRY_COLUMNS} FROM contable.journal_entry WHERE entity_id = $1 AND ($2::date IS NULL OR entry_date >= $2) AND ($3::date IS NULL OR entry_date <= $3) ORDER BY created_at, id LIMIT $4 OFFSET $5`,
-        [entityId, f.from ?? null, f.to ?? null, f.limit, f.offset],
+        `SELECT ${ENTRY_COLUMNS} FROM contable.journal_entry WHERE entity_id = $1 AND ($2::date IS NULL OR entry_date >= $2) AND ($3::date IS NULL OR entry_date <= $3) AND ($6::text IS NULL OR starts_with(source_id, $6 || ':')) ORDER BY entry_date DESC, created_at DESC, id DESC LIMIT $4 OFFSET $5`,
+        [entityId, f.from ?? null, f.to ?? null, f.limit, f.offset, f.sourcePrefix ?? null],
       ));
+    },
+    async countEntries(entityId, f) {
+      const r = await one("SELECT count(*)::text AS n FROM contable.journal_entry WHERE entity_id = $1 AND ($2::date IS NULL OR entry_date >= $2) AND ($3::date IS NULL OR entry_date <= $3) AND ($4::text IS NULL OR starts_with(source_id, $4 || ':'))", [entityId, f.from ?? null, f.to ?? null, f.sourcePrefix ?? null]);
+      return Number(r ? str(r, "n") : "0");
     },
     async totals(entityId, to) {
       return (await rows(

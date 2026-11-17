@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { LedgerError } from "./errors.js";
-import { DuplicateEntryError, type LedgerStore, type LedgerStoreTx } from "./ports.js";
+import { DuplicateEntryError, type EntryFilter, type LedgerStore, type LedgerStoreTx } from "./ports.js";
 import type { Account, BalanceRow, BalanceSheet, BusinessEvent, Chart, CivilDate, IncomeStatement, JournalEntry, JournalLine, LedgerEntity, PostingRule, StatementLine, TrialBalance } from "./types.js";
 
 // Motor contable multiempresa (spec 001). Reglas:
@@ -99,7 +99,9 @@ export interface Ledger {
   registerRule(input: RegisterRuleInput): Promise<PostingRule>;
   post(event: BusinessEvent): Promise<{ readonly entry: JournalEntry; readonly created: boolean }>;
   reverse(entryId: string, input: { readonly actor: string; readonly reason: string; readonly on?: CivilDate | undefined }): Promise<JournalEntry>;
-  entries(entityId: string, filter: { readonly from?: CivilDate | undefined; readonly to?: CivilDate | undefined; readonly limit?: number | undefined; readonly offset?: number | undefined }): Promise<readonly JournalEntry[]>;
+  /** Asientos del más reciente al más antiguo. */
+  entries(entityId: string, filter: EntryFilter & { readonly limit?: number | undefined; readonly offset?: number | undefined }): Promise<readonly JournalEntry[]>;
+  countEntries(entityId: string, filter: EntryFilter): Promise<number>;
   trialBalance(entityId: string, input: { readonly to: CivilDate }): Promise<TrialBalance>;
   /** Cuenta de resultados del periodo [from, to]. */
   incomeStatement(entityId: string, input: { readonly from: CivilDate; readonly to: CivilDate }): Promise<IncomeStatement>;
@@ -262,7 +264,14 @@ export function createLedger(deps: { readonly store: LedgerStore; readonly clock
     async entries(entityId, filter) {
       return deps.store.transaction(async (tx) => {
         await requireEntity(tx, entityId);
-        return tx.entries(entityId, { from: filter.from, to: filter.to, limit: Math.min(Math.max(filter.limit ?? 100, 1), 500), offset: Math.max(filter.offset ?? 0, 0) });
+        return tx.entries(entityId, { from: filter.from, to: filter.to, sourcePrefix: filter.sourcePrefix, limit: Math.min(Math.max(filter.limit ?? 100, 1), 500), offset: Math.max(filter.offset ?? 0, 0) });
+      });
+    },
+
+    async countEntries(entityId, filter) {
+      return deps.store.transaction(async (tx) => {
+        await requireEntity(tx, entityId);
+        return tx.countEntries(entityId, filter);
       });
     },
 

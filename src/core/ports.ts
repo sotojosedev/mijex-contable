@@ -1,5 +1,11 @@
 import type { Chart, CivilDate, JournalEntry, LedgerEntity, PostingRule } from "./types.js";
 
+export interface EntryFilter {
+  readonly from?: CivilDate | undefined;
+  readonly to?: CivilDate | undefined;
+  readonly sourcePrefix?: string | undefined;
+}
+
 /** Movimientos acumulados de una cuenta hasta una fecha. */
 export interface AccountTotals {
   readonly account: string;
@@ -31,7 +37,9 @@ export interface LedgerStoreTx {
   reversalOf(entryId: string): Promise<JournalEntry | undefined>;
   /** Inserta asiento y líneas. Con (entidad, origen, nombre) repetido lanza `DuplicateEntryError`. */
   insertEntry(entry: JournalEntry): Promise<void>;
-  entries(entityId: string, filter: { readonly from?: CivilDate | undefined; readonly to?: CivilDate | undefined; readonly limit: number; readonly offset: number }): Promise<readonly JournalEntry[]>;
+  /** Asientos del más reciente al más antiguo (fecha contable y alta). `sourcePrefix`: `source.id` que empieza por «prefijo:». */
+  entries(entityId: string, filter: EntryFilter & { readonly limit: number; readonly offset: number }): Promise<readonly JournalEntry[]>;
+  countEntries(entityId: string, filter: EntryFilter): Promise<number>;
   totals(entityId: string, to: CivilDate): Promise<readonly AccountTotals[]>;
 }
 

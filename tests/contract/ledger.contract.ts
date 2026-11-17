@@ -103,7 +103,7 @@ export function ledgerContract(name: string, makeEnv: () => Promise<ContractEnv>
         const tb = await ledger.trialBalance(entity.id, { to: "2026-12-31" });
         expect(tb.rows.every((r) => r.balance === 0n)).toBe(true);
         // El original sigue intacto.
-        expect((await ledger.entries(entity.id, {})).map((e) => e.id)).toEqual([entry.id, reversal.id]);
+        expect((await ledger.entries(entity.id, {})).map((e) => e.id)).toEqual([reversal.id, entry.id]);
       });
 
       it("no se revierte dos veces, ni una reversión, ni sin motivo", async () => {
@@ -163,6 +163,19 @@ export function ledgerContract(name: string, makeEnv: () => Promise<ContractEnv>
 
       it("un plan con códigos repetidos se rechaza", async () => {
         await expect(ledger.registerChart({ framework: "TEST", version: "x", validFrom: "2030-01-01", referenceIds: [], accounts: [ACCOUNTS[0], ACCOUNTS[0]] })).rejects.toMatchObject({ code: "CHART_INVALID" });
+      });
+    });
+
+    describe("diario paginado", () => {
+      it("del más reciente al más antiguo, con total y filtro por tipo de origen", async () => {
+        const amounts = { collected: 100n, commission: 100n, commissionTax: 0n, technicianShare: 0n };
+        await ledger.post(event({ occurredOn: "2026-11-01", source: { system: "hs", id: "Payment:1" }, amounts }));
+        await ledger.post(event({ occurredOn: "2026-11-03", source: { system: "hs", id: "Payout:2" }, amounts }));
+        await ledger.post(event({ occurredOn: "2026-11-02", source: { system: "hs", id: "Payment:3" }, amounts }));
+        expect((await ledger.entries(entity.id, {})).map((e) => e.entryDate)).toEqual(["2026-11-03", "2026-11-02", "2026-11-01"]);
+        expect((await ledger.entries(entity.id, { sourcePrefix: "Payment", limit: 1, offset: 1 })).map((e) => e.source.id)).toEqual(["Payment:1"]);
+        expect(await ledger.countEntries(entity.id, { sourcePrefix: "Payment" })).toBe(2);
+        expect(await ledger.countEntries(entity.id, { from: "2026-11-02", to: "2026-11-02" })).toBe(1);
       });
     });
 

@@ -1,4 +1,4 @@
-import { DuplicateEntryError, type AccountTotals, type LedgerStore, type LedgerStoreTx } from "../core/ports.js";
+import { DuplicateEntryError, type AccountTotals, type EntryFilter, type LedgerStore, type LedgerStoreTx } from "../core/ports.js";
 import type { Chart, JournalEntry, LedgerEntity, PostingRule } from "../core/types.js";
 
 /**
@@ -15,6 +15,10 @@ export function createMemoryLedgerStore(): LedgerStore {
   let state: State = { entities: new Map(), charts: new Map(), rules: [], entries: [] };
   let queue: Promise<unknown> = Promise.resolve();
 
+  const filtered = (s: State, entityId: string, f: EntryFilter): JournalEntry[] =>
+    s.entries
+      .filter((e) => e.entityId === entityId && (f.from === undefined || e.entryDate >= f.from) && (f.to === undefined || e.entryDate <= f.to) && (f.sourcePrefix === undefined || e.source.id.startsWith(`${f.sourcePrefix}:`)))
+      .sort((a, b) => b.entryDate.localeCompare(a.entryDate) || b.createdAt.getTime() - a.createdAt.getTime());
   const clone = (s: State): State => ({ entities: new Map(s.entities), charts: new Map(s.charts), rules: [...s.rules], entries: [...s.entries] });
 
   const tx = (s: State): LedgerStoreTx => ({
@@ -57,12 +61,8 @@ export function createMemoryLedgerStore(): LedgerStore {
       s.entries.push(e);
       return Promise.resolve();
     },
-    entries: (entityId, f) =>
-      Promise.resolve(
-        s.entries
-          .filter((e) => e.entityId === entityId && (f.from === undefined || e.entryDate >= f.from) && (f.to === undefined || e.entryDate <= f.to))
-          .slice(f.offset, f.offset + f.limit),
-      ),
+    entries: (entityId, f) => Promise.resolve(filtered(s, entityId, f).slice(f.offset, f.offset + f.limit)),
+    countEntries: (entityId, f) => Promise.resolve(filtered(s, entityId, f).length),
     totals: (entityId, to) => {
       const acc = new Map<string, AccountTotals>();
       for (const e of s.entries) {
