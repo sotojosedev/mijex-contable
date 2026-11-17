@@ -1,0 +1,81 @@
+{
+  "version": 2,
+  "skills": {
+    "billing-automation": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/payment-processing/skills/billing-automation/SKILL.md",
+      "computedHash": ""
+    },
+    "code-review-typescript": {
+      "source": "jamie-bitflight/claude_skills",
+      "sourceType": "github",
+      "skillPath": "plugins/development-harness/skills/code-review-typescript/SKILL.md",
+      "computedHash": ""
+    },
+    "es-autonomous-worker": {
+      "source": "openaccountants/openaccountants",
+      "commit": "bbab4f1a6d82cace432e6ca8eda89c98ffb1c038",
+      "sourceType": "github",
+      "skillPath": "agent-skills/es-autonomous-worker/SKILL.md",
+      "computedHash": "c5ca37060781a38306a78dba5c403d0a144b4a0450f8ce0a5e9f8df12b643d47",
+      "installMode": "copy"
+    },
+    "es-corporate-tax": {
+      "source": "openaccountants/openaccountants",
+      "commit": "bbab4f1a6d82cace432e6ca8eda89c98ffb1c038",
+      "sourceType": "github",
+      "skillPath": "agent-skills/es-corporate-tax/SKILL.md",
+      "computedHash": "42ac68ba02205701fb4299ee90aa0f5dff13268d98e0029dcadfb5c55706d1b5",
+      "installMode": "copy"
+    },
+    "es-vat-return": {
+      "source": "openaccountants/openaccountants",
+      "commit": "bbab4f1a6d82cace432e6ca8eda89c98ffb1c038",
+      "sourceType": "github",
+      "skillPath": "agent-skills/es-vat-return/SKILL.md",
+      "computedHash": "135d64b5411b05ece02cc647477ba99223949433cb74982b48e25b5fd50e4815",
+      "installMode": "copy"
+    },
+    "security-audit": {
+      "source": "cloudflare/security-audit-skill",
+      "sourceType": "github",
+      "skillPath": "skills/security-audit/SKILL.md",
+      "computedHash": ""
+    },
+    "spain-bookkeeping": {
+      "source": "openaccountants/openaccountants",
+      "commit": "bbab4f1a6d82cace432e6ca8eda89c98ffb1c038",
+      "sourceType": "github",
+      "skillPath": "agent-skills/spain-bookkeeping/SKILL.md",
+      "computedHash": "3ec8ea1fabc254c742388434b50ebc1ea24249118ed9fa42708dfed4d1fe908a",
+      "installMode": "copy"
+    },
+    "spain-einvoice": {
+      "source": "openaccountants/openaccountants",
+      "sourceType": "github",
+      "skillPath": "agent-skills/spain-einvoice/SKILL.md",
+      "computedHash": ""
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "commit": "c9be0e931b7930f7d02126d04774d904c381e7d7",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "3eb972c2d7c818e544e35cc33ea8d7147d4d78ae08142ef40037b0fbac7a2505",
+      "installMode": "copy"
+    },
+    "ts-testing": {
+      "source": "johnlindquist/claude-workshop-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ts-testing/SKILL.md",
+      "computedHash": ""
+    },
+    "typescript-pro": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/typescript-pro/SKILL.md",
+      "computedHash": ""
+    }
+  }
+}
