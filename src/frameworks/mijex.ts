@@ -14,6 +14,9 @@ export interface FrameworkAccount extends Account {
   readonly official?: string | undefined;
 }
 
+/** Gastos que forman el coste de ventas (presentación de la cuenta de resultados). */
+const COST_OF_SALES_ROLES: ReadonlySet<Role> = new Set(["COST_OF_SERVICES", "COST_OF_MATERIALS"]);
+
 export interface FrameworkData {
   readonly framework: string;
   readonly country: string;
@@ -25,7 +28,7 @@ export interface FrameworkData {
   readonly accounts: readonly FrameworkAccount[];
 }
 
-const a = (role: Role, code: string, name: string, type: Account["type"], normalSide: Account["normalSide"], official?: string): FrameworkAccount => ({ role, code, name, type, normalSide, ...(official ? { official } : {}) });
+const a = (role: Role, code: string, name: string, type: Account["type"], normalSide: Account["normalSide"], official?: string): FrameworkAccount => ({ role, code, name, type, normalSide, ...(official ? { official } : {}), ...(COST_OF_SALES_ROLES.has(role) ? { group: "COST_OF_SALES" as const } : {}) });
 
 /**
  * España — PGC PYMES (RD 1515/2007). Numeración y denominación no vinculantes (art. 3.1): MIJEX
@@ -102,7 +105,7 @@ export const MIJEX_FRAMEWORKS: readonly FrameworkData[] = [ES_PGC_PYMES, DO_NIIF
 
 /** Plan de cuentas del marco, listo para `registerChart`. */
 export function chartInput(fw: FrameworkData): RegisterChartInput {
-  return { framework: fw.framework, version: fw.version, validFrom: fw.validFrom, referenceIds: fw.referenceIds, accounts: fw.accounts.map(({ code, name, type, normalSide }) => ({ code, name, type, normalSide })) };
+  return { framework: fw.framework, version: fw.version, validFrom: fw.validFrom, referenceIds: fw.referenceIds, accounts: fw.accounts.map(({ code, name, type, normalSide, group }) => ({ code, name, type, normalSide, ...(group ? { group } : {}) })) };
 }
 
 /** Reglas de asiento del marco: una por evento; las líneas de roles que el marco no tiene se omiten (p. ej. ISR en ES). */
@@ -129,4 +132,16 @@ export async function installFramework(ledger: Ledger, fw: FrameworkData, input:
   const rules: PostingRule[] = [];
   for (const rule of ruleInputs(fw)) rules.push(await ledger.registerRule(rule));
   return { chart: approved, rules };
+}
+
+/** Instala el marco solo si su versión no existe todavía (arranque de las apps). */
+export async function ensureFramework(ledger: Ledger, fw: FrameworkData, input: { readonly approvedBy: string }): Promise<"INSTALLED" | "PRESENT"> {
+  if ((await ledger.charts(fw.framework)).some((c) => c.version === fw.version)) return "PRESENT";
+  await installFramework(ledger, fw, input);
+  return "INSTALLED";
+}
+
+/** Marco de la entidad PLATFORM de MIJEX en un país (dato: el país de cada marco). */
+export function frameworkForCountry(country: string): FrameworkData | undefined {
+  return MIJEX_FRAMEWORKS.find((fw) => fw.country === country);
 }

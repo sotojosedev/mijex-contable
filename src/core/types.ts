@@ -30,6 +30,8 @@ export interface Account {
   readonly name: string;
   readonly type: AccountType;
   readonly normalSide: Side;
+  /** Presentación en la cuenta de resultados: gasto que forma parte del coste de ventas. */
+  readonly group?: "COST_OF_SALES" | undefined;
 }
 
 /** Plan de cuentas de un marco, versionado por vigencia [validFrom, validTo). */
@@ -127,4 +129,42 @@ export interface TrialBalance {
   readonly rows: readonly BalanceRow[];
   readonly totalDebit: Minor;
   readonly totalCredit: Minor;
+}
+
+export interface StatementLine {
+  readonly account: string;
+  readonly name: string;
+  /** En el lado normal de la cuenta. */
+  readonly amount: Minor;
+}
+
+/** Cuenta de resultados de un periodo [from, to] (fechas incluidas). Contra-ingresos: ingresos de saldo deudor. */
+export interface IncomeStatement {
+  readonly entityId: string;
+  readonly from: CivilDate;
+  readonly to: CivilDate;
+  readonly currency: string;
+  readonly revenue: readonly StatementLine[];
+  readonly contraRevenue: readonly StatementLine[];
+  readonly costOfSales: readonly StatementLine[];
+  readonly operatingExpenses: readonly StatementLine[];
+  readonly grossRevenue: Minor;
+  readonly netRevenue: Minor;
+  readonly grossProfit: Minor;
+  readonly netIncome: Minor;
+}
+
+/** Balance de situación a una fecha: activo = pasivo + patrimonio (con el resultado no cerrado). */
+export interface BalanceSheet {
+  readonly entityId: string;
+  readonly at: CivilDate;
+  readonly currency: string;
+  readonly assets: readonly StatementLine[];
+  readonly liabilities: readonly StatementLine[];
+  readonly equity: readonly StatementLine[];
+  readonly currentEarnings: Minor;
+  readonly totalAssets: Minor;
+  readonly totalLiabilities: Minor;
+  readonly totalEquity: Minor;
+  readonly balanced: boolean;
 }

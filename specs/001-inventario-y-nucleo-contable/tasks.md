@@ -14,5 +14,13 @@
 - [x] T09 Catálogo de 15 eventos con roles (`src/frameworks/events.ts`) y reglas generadas por marco (R-ES-101…115, R-DO-101…115); `installFramework`. Usuario: «no esperes a mi contador» (REF-DEC-006).
 - Fuera de los eventos: la reclasificación del modelo anterior (cuenta 1120/4300) y los reajustes `settled:*` de HS se harán con reversión + nuevo asiento en la fase 2.
 
-## Fase 2 y siguientes
-Comparador HS, conciliación común, 606/607/608 e IR-17, entidades de organizaciones y comunidades (con sus fuentes).
+## Fase 2 — HS en modo sombra
+- [x] T10 Librería: `ledger.charts`, `ledger.entryBySource`, `ensureFramework`, `frameworkForCountry`.
+- [x] T11 HS spec 039: traductor de asientos, réplica idempotente (job y script) y comparador por rol. Verificado en memoria y en PostgreSQL real (base de pruebas).
+- [ ] T12 Activar en desarrollo o producción y revisar el comparador con datos reales (con confirmación).
+- [ ] T13 Cubrir los asientos sin equivalente (modelo anterior, reajustes `settled:*`).
+- [x] T14a Informes en la librería: `incomeStatement` (contra-ingresos = ingresos de saldo deudor; coste de ventas = grupo `COST_OF_SALES`, dato del plan) y `balanceSheet` (resultado no cerrado en el patrimonio), en bigint; migración 0002 (grupo de la cuenta).
+- [ ] T14b Retirar el mayor de HS y pasar sus pantallas a los informes de la librería; 606/607/608 e IR-17 (*stop condition*).
+
+## Siguientes
+Conciliación común (hecha: spec 002), entidades de organizaciones y comunidades (con sus fuentes).

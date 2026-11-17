@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { createLedger } from "../../src/core/ledger.js";
 import { MIJEX_EVENTS } from "../../src/frameworks/events.js";
-import { DO_NIIF_PYMES, ES_PGC_PYMES, installFramework, MIJEX_FRAMEWORKS, ruleInputs, type FrameworkData } from "../../src/frameworks/mijex.js";
+import { DO_NIIF_PYMES, ensureFramework, ES_PGC_PYMES, frameworkForCountry, installFramework, MIJEX_FRAMEWORKS, ruleInputs, type FrameworkData } from "../../src/frameworks/mijex.js";
 import { createMemoryLedgerStore } from "../../src/testing/memory-store.js";
 
 // Spec 001 · fase 1b: marcos de MIJEX como datos (R-ES-101…, R-DO-101…).
@@ -102,5 +102,38 @@ describe("marcos de MIJEX como datos", () => {
     const { ledger, entity } = await ledgerWith(DO_NIIF_PYMES);
     const { entry } = await ledger.post({ entityId: entity.id, type: "PayoutApproved", source: { system: "hs", id: "p1" }, name: "approved", occurredOn: "2026-11-10", currency: "DOP", amounts: { total: 33_700n, commissionTax: 2_700n, isr: 3_000n, itbis: 18_000n, clientWithheld: 10_000n } });
     expect(entry.lines.map((l) => [l.account, l.debit, l.credit])).toEqual([["2110", 33_700n, 0n], ["2120", 0n, 2_700n], ["2130", 0n, 3_000n], ["2140", 0n, 18_000n], ["2150", 0n, 10_000n]]);
+  });
+});
+
+describe("arranque de las apps", () => {
+  it("ensureFramework instala una vez y luego informa de que ya está; el marco sale del país", async () => {
+    const ledger = createLedger({ store: createMemoryLedgerStore() });
+    expect(await ensureFramework(ledger, DO_NIIF_PYMES, { approvedBy: "u" })).toBe("INSTALLED");
+    expect(await ensureFramework(ledger, DO_NIIF_PYMES, { approvedBy: "u" })).toBe("PRESENT");
+    expect(frameworkForCountry("ES")?.framework).toBe("ES-PGC-PYMES");
+    expect(frameworkForCountry("XX")).toBeUndefined();
+  });
+
+  it("entryBySource encuentra el asiento de un hecho", async () => {
+    const { ledger, entity } = await ledgerWith(DO_NIIF_PYMES);
+    const { entry } = await ledger.post({ entityId: entity.id, type: "TechnicianPaid", source: { system: "hs", id: "x" }, name: "paid", occurredOn: "2026-11-10", currency: "DOP", amounts: { amount: 1n } });
+    expect((await ledger.entryBySource(entity.id, { system: "hs", id: "x" }, "paid"))?.id).toBe(entry.id);
+    expect(await ledger.entryBySource(entity.id, { system: "hs", id: "y" }, "paid")).toBeUndefined();
+  });
+});
+
+describe("cuenta de resultados con los marcos de MIJEX", () => {
+  it("contra-ingreso, coste de ventas (dato del plan) y gastos de explotación", async () => {
+    for (const fw of MIJEX_FRAMEWORKS) {
+      const { ledger, entity } = await ledgerWith(fw);
+      const post = (type: string, id: string, amounts: Record<string, bigint>) => ledger.post({ entityId: entity.id, type, source: { system: "hs", id }, name: "n", occurredOn: "2026-11-10", currency: entity.currency, amounts });
+      await post("ServiceSettledEmployee", "s1", { gross: 118_000n, labor: 100_000n, tax: 18_000n, bonus: 5_000n });
+      await post("MaterialsSold", "m1", { gross: 11_800n, base: 10_000n, tax: 1_800n });
+      await post("PurchaseInvoiced", "c1", { subtotal: 6_000n, tax: 1_080n, total: 7_080n });
+      const pl = await ledger.incomeStatement(entity.id, { from: "2026-11-01", to: "2026-11-30" });
+      expect({ gross: pl.grossRevenue, net: pl.netRevenue, cos: pl.costOfSales.map((l) => l.amount).sort(), profit: pl.grossProfit, net2: pl.netIncome }, fw.framework)
+        .toEqual({ gross: 110_000n, net: 110_000n, cos: [5_000n, 6_000n].sort(), profit: 99_000n, net2: 99_000n });
+      expect((await ledger.balanceSheet(entity.id, { at: "2026-11-30" })).balanced).toBe(true);
+    }
   });
 });

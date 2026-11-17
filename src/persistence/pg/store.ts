@@ -36,12 +36,12 @@ function api(client: PoolClient): LedgerStoreTx {
 
   const chartsWithAccounts = async (charts: Row[]): Promise<Chart[]> => {
     if (charts.length === 0) return [];
-    const accounts = await rows("SELECT chart_id, code, name, type, normal_side FROM contable.account WHERE chart_id = ANY($1::uuid[]) ORDER BY chart_id, position", [charts.map((c) => c.id)]);
+    const accounts = await rows("SELECT chart_id, code, name, type, normal_side, statement_group FROM contable.account WHERE chart_id = ANY($1::uuid[]) ORDER BY chart_id, position", [charts.map((c) => c.id)]);
     return charts.map((c) => ({
       id: str(c, "id"), framework: str(c, "framework"), version: str(c, "version"), validFrom: str(c, "valid_from"), validTo: optStr(c, "valid_to"),
       status: str(c, "status") as Chart["status"], approvedBy: optStr(c, "approved_by"), approvedAt: c.approved_at ? new Date(str(c, "approved_at")) : undefined,
       referenceIds: c.reference_ids as string[],
-      accounts: accounts.filter((a) => a.chart_id === c.id).map((a): Account => ({ code: str(a, "code"), name: str(a, "name"), type: str(a, "type") as Account["type"], normalSide: str(a, "normal_side") as Account["normalSide"] })),
+      accounts: accounts.filter((a) => a.chart_id === c.id).map((a): Account => ({ code: str(a, "code"), name: str(a, "name"), type: str(a, "type") as Account["type"], normalSide: str(a, "normal_side") as Account["normalSide"], ...(a.statement_group === "COST_OF_SALES" ? { group: "COST_OF_SALES" as const } : {}) })),
     }));
   };
 
@@ -86,8 +86,8 @@ function api(client: PoolClient): LedgerStoreTx {
     async insertChart(c) {
       await client.query("INSERT INTO contable.chart (id, framework, version, valid_from, valid_to, status, reference_ids) VALUES ($1,$2,$3,$4,$5,$6,$7)", [c.id, c.framework, c.version, c.validFrom, c.validTo ?? null, c.status, [...c.referenceIds]]);
       await client.query(
-        "INSERT INTO contable.account (chart_id, code, name, type, normal_side, position) SELECT $1, a.code, a.name, a.type, a.normal_side, a.position FROM jsonb_to_recordset($2::jsonb) AS a(code TEXT, name TEXT, type TEXT, normal_side TEXT, position INT)",
-        [c.id, JSON.stringify(c.accounts.map((a, i) => ({ code: a.code, name: a.name, type: a.type, normal_side: a.normalSide, position: i })))],
+        "INSERT INTO contable.account (chart_id, code, name, type, normal_side, position, statement_group) SELECT $1, a.code, a.name, a.type, a.normal_side, a.position, a.statement_group FROM jsonb_to_recordset($2::jsonb) AS a(code TEXT, name TEXT, type TEXT, normal_side TEXT, position INT, statement_group TEXT)",
+        [c.id, JSON.stringify(c.accounts.map((a, i) => ({ code: a.code, name: a.name, type: a.type, normal_side: a.normalSide, position: i, statement_group: a.group ?? null })))],
       );
     },
     async approveChart(id, by, at) {

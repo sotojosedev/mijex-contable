@@ -166,6 +166,20 @@ export function ledgerContract(name: string, makeEnv: () => Promise<ContractEnv>
       });
     });
 
+    describe("cuenta de resultados y balance de situación (bigint)", () => {
+      it("el ingreso del periodo, el balance cuadrado y el resultado no cerrado en el patrimonio", async () => {
+        await ledger.post(event({ occurredOn: "2026-10-31", source: { system: "hs", id: "oct" }, amounts: { collected: 59_000n, commission: 7_500n, commissionTax: 1_350n, technicianShare: 50_150n } }));
+        await ledger.post(event({ amounts: { collected: 118_000n, commission: 15_000n, commissionTax: 2_700n, technicianShare: 100_300n } }));
+        const pl = await ledger.incomeStatement(entity.id, { from: "2026-11-01", to: "2026-11-30" });
+        expect(pl).toMatchObject({ grossRevenue: 15_000n, netRevenue: 15_000n, grossProfit: 15_000n, netIncome: 15_000n });
+        expect(pl.revenue).toEqual([{ account: "4110", name: "Comisiones", amount: 15_000n }]);
+        const bs = await ledger.balanceSheet(entity.id, { at: "2026-11-30" });
+        expect(bs).toMatchObject({ currentEarnings: 22_500n, balanced: true });
+        expect(bs.totalAssets).toBe(bs.totalLiabilities + bs.totalEquity);
+        await expect(ledger.incomeStatement(entity.id, { from: "2026-12-01", to: "2026-11-01" })).rejects.toMatchObject({ code: "INVALID_INPUT" });
+      });
+    });
+
     describe("entidades multiempresa (Clarify Q1)", () => {
       it("una entidad por (sistema, ref): registrarla otra vez devuelve la misma", async () => {
         const again = await ledger.registerEntity({ kind: "PLATFORM", country: "DO", currency: "DOP", framework: "TEST", external: { system: "hs", ref: "platform-DO" }, name: "MIJEX DO" });

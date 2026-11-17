@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { LedgerError } from "./errors.js";
 import { DuplicateEntryError, type LedgerStore, type LedgerStoreTx } from "./ports.js";
-import type { Account, BalanceRow, BusinessEvent, Chart, CivilDate, JournalEntry, JournalLine, LedgerEntity, PostingRule, TrialBalance } from "./types.js";
+import type { Account, BalanceRow, BalanceSheet, BusinessEvent, Chart, CivilDate, IncomeStatement, JournalEntry, JournalLine, LedgerEntity, PostingRule, StatementLine, TrialBalance } from "./types.js";
 
 // Motor contable multiempresa (spec 001). Reglas:
 // - R-CORE-002: cada asiento cuadra (Σ debe = Σ haber, en bigint) o se rechaza.
@@ -51,6 +51,27 @@ const sameEntry = (a: JournalEntry, e: BusinessEvent, lines: readonly JournalLin
   a.eventType === e.type && a.entryDate === e.occurredOn && a.currency === e.currency &&
   a.lines.length === lines.length && a.lines.every((l, i) => l.account === lines[i]?.account && l.debit === lines[i].debit && l.credit === lines[i].credit);
 
+/** Día anterior a una fecha civil. */
+function previousDay(date: CivilDate): CivilDate {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Cuentas del marco: las del plan vigente en la fecha y, para códigos antiguos, la última versión que los tuvo. */
+async function accountsOf(tx: LedgerStoreTx, framework: string, on: CivilDate): Promise<Map<string, Account>> {
+  const map = new Map<string, Account>();
+  const charts = [...(await tx.charts(framework))].sort((a, b) => a.validFrom.localeCompare(b.validFrom));
+  for (const chart of charts) for (const a of chart.accounts) if (!map.has(a.code) || inForce(chart, on) || chart.validFrom <= on) map.set(a.code, a);
+  return map;
+}
+
+/** Línea de estado en el lado normal de la cuenta (sin cuenta conocida: deudora). */
+function statementLine(l: { account: string; debit: bigint; credit: bigint }, account: Account | undefined): StatementLine {
+  const debitNormal = (account?.normalSide ?? "DEBIT") === "DEBIT";
+  return { account: l.account, name: account?.name ?? l.account, amount: debitNormal ? l.debit - l.credit : l.credit - l.debit };
+}
+
 export interface RegisterEntityInput {
   readonly kind: LedgerEntity["kind"];
   readonly country: string;
@@ -80,6 +101,14 @@ export interface Ledger {
   reverse(entryId: string, input: { readonly actor: string; readonly reason: string; readonly on?: CivilDate | undefined }): Promise<JournalEntry>;
   entries(entityId: string, filter: { readonly from?: CivilDate | undefined; readonly to?: CivilDate | undefined; readonly limit?: number | undefined; readonly offset?: number | undefined }): Promise<readonly JournalEntry[]>;
   trialBalance(entityId: string, input: { readonly to: CivilDate }): Promise<TrialBalance>;
+  /** Cuenta de resultados del periodo [from, to]. */
+  incomeStatement(entityId: string, input: { readonly from: CivilDate; readonly to: CivilDate }): Promise<IncomeStatement>;
+  /** Balance de situación a una fecha. */
+  balanceSheet(entityId: string, input: { readonly at: CivilDate }): Promise<BalanceSheet>;
+  /** Planes de cuentas de un marco (todas las versiones). */
+  charts(framework: string): Promise<readonly Chart[]>;
+  /** Asiento de un hecho (entidad, origen, nombre), si ya está registrado. */
+  entryBySource(entityId: string, source: { readonly system: string; readonly id: string }, name: string): Promise<JournalEntry | undefined>;
 }
 
 export function createLedger(deps: { readonly store: LedgerStore; readonly clock?: Clock | undefined }): Ledger {
@@ -234,6 +263,64 @@ export function createLedger(deps: { readonly store: LedgerStore; readonly clock
       return deps.store.transaction(async (tx) => {
         await requireEntity(tx, entityId);
         return tx.entries(entityId, { from: filter.from, to: filter.to, limit: Math.min(Math.max(filter.limit ?? 100, 1), 500), offset: Math.max(filter.offset ?? 0, 0) });
+      });
+    },
+
+    async incomeStatement(entityId, { from, to }) {
+      assertDate(from, "Inicio del periodo");
+      assertDate(to, "Fin del periodo");
+      if (from > to) invalid("El periodo empieza después de terminar");
+      return deps.store.transaction(async (tx) => {
+        const entity = await requireEntity(tx, entityId);
+        const accounts = await accountsOf(tx, entity.framework, to);
+        const before = new Map((await tx.totals(entityId, previousDay(from))).map((t) => [t.account, t]));
+        const lines = (await tx.totals(entityId, to)).map((t) => {
+          const b = before.get(t.account);
+          return { account: t.account, debit: t.debit - (b?.debit ?? 0n), credit: t.credit - (b?.credit ?? 0n) };
+        });
+        const of = (pick: (a: Account | undefined) => boolean): StatementLine[] =>
+          lines.filter((l) => pick(accounts.get(l.account)) && (l.debit !== 0n || l.credit !== 0n)).map((l) => statementLine(l, accounts.get(l.account))).sort((a, b) => a.account.localeCompare(b.account));
+        const revenue = of((a) => a?.type === "REVENUE" && a.normalSide === "CREDIT");
+        const contraRevenue = of((a) => a?.type === "REVENUE" && a.normalSide === "DEBIT");
+        const costOfSales = of((a) => a?.type === "EXPENSE" && a.group === "COST_OF_SALES");
+        const operatingExpenses = of((a) => a?.type === "EXPENSE" && a.group !== "COST_OF_SALES");
+        const sum = (xs: readonly StatementLine[]) => xs.reduce((s, x) => s + x.amount, 0n);
+        const grossRevenue = sum(revenue);
+        const netRevenue = grossRevenue - sum(contraRevenue);
+        const grossProfit = netRevenue - sum(costOfSales);
+        return { entityId, from, to, currency: entity.currency, revenue, contraRevenue, costOfSales, operatingExpenses, grossRevenue, netRevenue, grossProfit, netIncome: grossProfit - sum(operatingExpenses) };
+      });
+    },
+
+    async balanceSheet(entityId, { at }) {
+      assertDate(at, "Fecha del balance");
+      return deps.store.transaction(async (tx) => {
+        const entity = await requireEntity(tx, entityId);
+        const accounts = await accountsOf(tx, entity.framework, at);
+        const lines = (await tx.totals(entityId, at)).filter((t) => t.debit !== 0n || t.credit !== 0n);
+        const of = (type: Account["type"]): StatementLine[] => lines.filter((l) => (accounts.get(l.account)?.type ?? "ASSET") === type).map((l) => statementLine(l, accounts.get(l.account))).sort((a, b) => a.account.localeCompare(b.account));
+        const pl = lines.filter((l) => ["REVENUE", "EXPENSE"].includes(accounts.get(l.account)?.type ?? ""));
+        const currentEarnings = pl.reduce((s, l) => s + l.credit - l.debit, 0n);
+        const sum = (xs: readonly StatementLine[]) => xs.reduce((s, x) => s + x.amount, 0n);
+        const assets = of("ASSET");
+        const liabilities = of("LIABILITY");
+        const equity = of("EQUITY");
+        const totalAssets = sum(assets);
+        const totalLiabilities = sum(liabilities);
+        const totalEquity = sum(equity) + currentEarnings;
+        return { entityId, at, currency: entity.currency, assets, liabilities, equity, currentEarnings, totalAssets, totalLiabilities, totalEquity, balanced: totalAssets === totalLiabilities + totalEquity };
+      });
+    },
+
+    async charts(framework) {
+      assertText(framework, "Marco");
+      return deps.store.transaction((tx) => tx.charts(framework));
+    },
+
+    async entryBySource(entityId, source, name) {
+      return deps.store.transaction(async (tx) => {
+        await requireEntity(tx, entityId);
+        return tx.entryBySource(entityId, source.system, source.id, name);
       });
     },
 
