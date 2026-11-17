@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Estado | **Propuesta: no cargada.** Cada cuenta y cada regla requiere la aprobación del usuario y la revisión del contador (*stop condition*, AGENTS.md §4) |
+| Estado | **Superada** por la implementación de la fase 1b (`src/frameworks/`), decidida con las normas oficiales (REF-DEC-006). Diferencias con esta propuesta: 4100 lleva su nombre oficial; pasarelas → 4402 ⊂ 440; comisión → 7051 ⊂ 705 (ICAC 2021 art. 34.8: es cifra de negocios); técnico empleado → 640 |
 | Fecha | 2026-11-17 |
 | Base | Mayor actual de HS (`wt-hs-contingencia/backend/src/services/ledger.ts`, 21 cuentas, unos 20 eventos) |
 | Fuentes | ES: PGC PYMES, RD 1515/2007 (REF-ES-005, texto consolidado del BOE). Códigos y nombres copiados literalmente del cuadro de cuentas. RD: no hay plan oficial obligatorio; NIIF para PYMES (ICPARD, REF-DO-…) |

@@ -3,3 +3,4 @@ export { isLedgerError, LedgerError, type LedgerErrorCode } from "./core/errors.
 export { DuplicateEntryError, type AccountTotals, type LedgerStore, type LedgerStoreTx } from "./core/ports.js";
 export type * from "./core/types.js";
 export * from "./reconciliation/index.js";
+export * from "./frameworks/index.js";

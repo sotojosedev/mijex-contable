@@ -9,9 +9,10 @@
 - [x] T06 Verificación: lint, typecheck, test, test:pg, build, knip.
 
 ## Fase 1b — Datos por país (cada cuenta y regla, aprobada por el usuario)
-- [ ] T07 ES: cuentas del PGC PYMES (BOE-A-2007-19966) que usan los eventos de MIJEX; mapeo evento → cuentas para revisión.
-- [ ] T08 DO: plan NIIF para PYMES propuesto («pendiente de revisión del contador»).
-- [ ] T09 Reglas de asiento de los eventos de HS (hoy en `ledger.ts`), en paralelo con el motor actual.
+- [x] T07 ES: marco ES-PGC-PYMES con cuentas oficiales o subcuentas (art. 3.1), verificadas contra el cuadro del BOE. Decisiones con fuente: el agente solo reconoce su comisión (ICAC 2021 art. 26.4 y art. 34.8; NRV 14.ª) → 4101 ⊂ 410 para los fondos de técnicos; comisión 7051 ⊂ 705 (cifra de negocios); pasarelas 4402 ⊂ 440 (deudor de tráfico, no entidad de crédito); técnico empleado 640.
+- [x] T08 DO: marco DO-NIIF-PYMES (ICPARD Res. 002/2010; NIIF PYMES secc. 23) con plan propio y los códigos de HS.
+- [x] T09 Catálogo de 15 eventos con roles (`src/frameworks/events.ts`) y reglas generadas por marco (R-ES-101…115, R-DO-101…115); `installFramework`. Usuario: «no esperes a mi contador» (REF-DEC-006).
+- Fuera de los eventos: la reclasificación del modelo anterior (cuenta 1120/4300) y los reajustes `settled:*` de HS se harán con reversión + nuevo asiento en la fase 2.
 
 ## Fase 2 y siguientes
 Comparador HS, conciliación común, 606/607/608 e IR-17, entidades de organizaciones y comunidades (con sus fuentes).

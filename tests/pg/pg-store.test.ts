@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createPgLedgerStore } from "../../src/persistence/pg/store.js";
 import { createLedger } from "../../src/core/ledger.js";
 import { ledgerContract } from "../contract/ledger.contract.js";
+import { installFramework, MIJEX_EVENTS, MIJEX_FRAMEWORKS } from "../../src/frameworks/index.js";
 import { resetDatabase, testPool } from "./pg-env.js";
 
 const pool = testPool();
@@ -61,5 +62,21 @@ describe("PostgreSQL: garantías del esquema", () => {
     expect(r1.entry.id).toBe(r2.entry.id);
     expect([r1.created, r2.created].filter(Boolean)).toHaveLength(1);
     expect((await pool.query("SELECT 1 FROM contable.journal_entry WHERE source_id = 'dup'")).rowCount).toBe(1);
+  });
+});
+
+describe("PostgreSQL: marcos de MIJEX (fase 1b)", () => {
+  beforeEach(() => resetDatabase(pool));
+
+  it("instala ES-PGC-PYMES y DO-NIIF-PYMES aprobados y registra un asiento por evento", async () => {
+    const ledger = createLedger({ store: createPgLedgerStore({ pool }) });
+    for (const fw of MIJEX_FRAMEWORKS) {
+      const { chart, rules } = await installFramework(ledger, fw, { approvedBy: "usuario (REF-DEC-006)" });
+      expect(chart.status).toBe("APPROVED");
+      expect(rules).toHaveLength(MIJEX_EVENTS.length);
+    }
+    const entity = await ledger.registerEntity({ kind: "PLATFORM", country: "DO", currency: "DOP", framework: "DO-NIIF-PYMES", external: { system: "hs", ref: "platform-DO" }, name: "MIJEX DO" });
+    const { entry } = await ledger.post({ entityId: entity.id, type: "ServiceSettledAgent", source: { system: "hs", id: "e1" }, name: "accrued_agent", occurredOn: "2026-11-10", currency: "DOP", amounts: { gross: 118_000n, commission: 15_000n, commissionTax: 2_700n, technicianPayable: 100_300n, technicianCash: 0n } });
+    expect(entry.lines.map((l) => l.account)).toEqual(["2150", "4110", "2120", "2110"]);
   });
 });
