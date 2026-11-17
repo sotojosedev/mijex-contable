@@ -77,19 +77,44 @@ lleva su referencia oficial. Primeros países: **España (ES)** y **República D
 
 ## 3. Arquitectura
 
-_Pendiente._
+Paquete `@sotojosedev/contable-core` (privado, sin publicar). Es TypeScript ESM estricto, con
+la misma forma que `mijex-fiscal`:
+- núcleo de dominio (`src/core`);
+- puerto de almacén (`LedgerStore`) con implementaciones en memoria (`src/testing`) y en
+  PostgreSQL (`src/persistence/pg`);
+- tests de contrato comunes a los dos almacenes.
+
+El motor **no conoce países, cuentas ni eventos concretos**: planes de cuentas y reglas de
+asiento son datos por marco contable (p. ej. `ES-PGC-PYMES`, `DO-NIIF-PYMES`), versionados por
+vigencia (R-CORE-005).
 
 ## 4. Módulos
 
-_Pendiente._
+| Módulo | Qué hace |
+|---|---|
+| `core/types.ts` | Entidad contable (multiempresa y por país), plan, cuenta, regla de asiento, evento de negocio, asiento, balance |
+| `core/ledger.ts` | `createLedger`: `registerEntity` (idempotente por sistema y ref), `registerChart` + `approveChart` (solo un plan aprobado admite asientos; la versión nueva cierra la anterior), `registerRule`, `post` (R-CORE-002/004), `reverse` (R-CORE-003), `entries`, `trialBalance` |
+| `core/errors.ts` | `LedgerError` con códigos tipados |
 
 ## 5. Persistencia
 
-_Pendiente._
+Esquema `contable` (migración `0001_core.sql`), aplicado con el `migrate` de `fiscal-core`
+(reutilizado, con la opción `schema`):
+- `entity`, `chart`, `account`, `posting_rule`, `journal_entry` y `journal_line`;
+- importes BIGINT con `CHECK` (≥ 0 y un solo lado por línea);
+- índice único de idempotencia (entidad, origen, nombre);
+- una sola reversión por asiento;
+- triggers de solo inserción (`reject_mutation`, `chart_guard`, `posting_rule_guard`,
+  `account_draft_only`);
+- cuadre por asiento con un *constraint trigger* diferido;
+- un solo plan aprobado abierto por marco y una sola regla abierta por evento (índices
+  parciales).
 
 ## 6. Integraciones
 
-_Pendiente (p. ej. `@mijex/fiscal-core`)._
+- `@sotojosedev/fiscal-core`, enlazado en local (`file:../wt-fiscal-contingencia`) hasta que
+  se publique la 0.5.0: se reutilizan `migrate` y, en las próximas fases, el dinero (`money.ts`).
+- Pendiente: que HS y Property emitan eventos de negocio a la librería (fase 2).
 
 ## 7. Pendiente y decisiones abiertas
 
@@ -111,3 +136,5 @@ _Ninguna registrada._
 | 2026-11-17 | Commit local `099ef3d` de la spec 012 en `wt-fiscal-contingencia`. Fase 1 (dinero y retenciones): HS spec 036 (retenciones RD versionadas por vigencia, ITBIS sobre el ITBIS facturado, PUT con motivo y `auditInTx`, versiones inmutables por trigger, sumas de la liquidación en bigint) y Property spec 059 (`fromMinorUnits` exacto, impuesto y retención redondeados half-up, semilla v1 muerta borrada). Nuevas R-CORE-001, REF-DEC-001 y REF-DEC-002; R-DO-005 y R-DO-006 implementadas. Pendiente: `round2` de la contabilidad de HS (spec 037 o migración a esta librería). | HS 036, Property 059 | §2.2 |
 | 2026-11-17 | Fase 3, Property spec 060: avisos fiscales reales (campana + email a ORG_ADMIN o a la plataforma según el emisor, deduplicados), estados traducidos (CONTINGENCIA, POR_CONFIRMAR), leyenda oficial de contingencia en el PDF, Centro de Control Fiscal `/admin/fiscal-control/*` (motivo obligatorio, auditoría, alcance por país, rate limit) y la pestaña «Control fiscal». La librería expone `PlatformFiscalCore.contingency`. Verificación: 420 unitarios, 31 e2e y 318 tests del frontend en verde. | Property 060, fiscal 012 | §6 |
 | 2026-11-17 | Fase 4, HS spec 038: avisos fiscales al técnico y a los admins de su país (tipo FISCAL obligatorio, sin duplicar en BD), Centro de Control (consulta sin reenvío, reintento con motivo, cronología, OFV/serie B, incidencias ES; `auditInTx`; rate limit), listado sin N+1 (`listDocuments({ ids })`) y leyenda en el PDF. Librería: `noticeContent` común (Property lo reutiliza) y QR R-DO-007 (versión 8 o la mínima superior con la URL completa, comprobada por lectura; pendiente de confirmar con la DGII, REF-DEC-003). | HS 038, fiscal 012 | §6 |
+| 2026-11-17 | Spec 001 (Clarify: multiempresa y por país; PGC/PGC PYMES en ES y NIIF PYMES en RD; 606/607/608 e IR-17 aquí; persistencia como mijex-fiscal). Fase 1a implementada: motor `createLedger`, almacenes en memoria y PostgreSQL (esquema `contable`, migración 0001), R-CORE-002…005 con 16 pruebas de contrato en memoria y 19 en PostgreSQL. Copias oficiales del PGC y del PGC PYMES (REF-ES-004/005). `fiscal-core` gana `migrate({ schema })` para reutilizarlo. | 001 | §3, §4, §5, §6 |
+| 2026-11-17 | Propuesta de la fase 1b (`specs/001-…/propuesta-fase-1b.md`): correspondencia de las 21 cuentas de HS con el PGC PYMES (códigos y nombres literales del BOE) y con un plan propio NIIF PYMES para RD, y reglas por evento. Sin cargar: pendiente del contador y del usuario. | 001 | — |

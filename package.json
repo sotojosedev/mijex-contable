@@ -1,0 +1,56 @@
+{
+  "name": "@sotojosedev/contable-core",
+  "version": "0.0.0",
+  "description": "Núcleo contable común de MIJEX (multiempresa y multipaís) para Home Services y Property.",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "migrations",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./pg": {
+      "types": "./dist/persistence/pg/index.d.ts",
+      "import": "./dist/persistence/pg/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "knip": "knip",
+    "test": "vitest run --project unit",
+    "test:pg": "vitest run --project pg",
+    "test:watch": "vitest --project unit"
+  },
+  "dependencies": {
+    "@sotojosedev/fiscal-core": "file:../wt-fiscal-contingencia",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.2",
+    "eslint": "^10.15.0",
+    "knip": "^5.88.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^4.1.12"
+  }
+}
