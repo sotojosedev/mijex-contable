@@ -40,10 +40,23 @@ describe("[R-CORE-006] lectura del extracto bancario", () => {
     expect(parseBankStatementCsv("Fecha;Concepto;Importe", { accountId: "x" }).movements).toEqual([]);
   });
 
+  it("el concepto es obligatorio salvo que la app lo desactive (HS admite líneas sin concepto)", () => {
+    const csv = "Fecha;Concepto;Importe\n01/03/2026;;10,00";
+    expect(parseBankStatementCsv(csv, { accountId: "d" }).movements).toEqual([]);
+    expect(parseBankStatementCsv(csv, { accountId: "d", requireDescription: false }).movements.map((m) => m.amount)).toEqual([1_000n]);
+    // Sin columna de concepto, con la opción desactivada, también se lee.
+    expect(parseBankStatementCsv("Fecha;Importe\n01/03/2026;5", { accountId: "d", requireDescription: false }).movements).toHaveLength(1);
+  });
+
   it("importes con más de dos decimales se rechazan en vez de redondearse en silencio", () => {
     const r = parseBankStatementCsv("Fecha;Concepto;Importe\n01/03/2026;Raro;10,005", { accountId: "d" });
     expect(r.movements).toEqual([]);
     expect(r.errors[0]?.line).toBe(2);
+  });
+
+  it("no recorta concepto ni referencia (la huella debe coincidir con la de Property)", () => {
+    const long = "x".repeat(400);
+    expect(parseBankStatementCsv(`Fecha;Concepto;Importe\n01/03/2026;${long};1`, { accountId: "d" }).movements[0]?.description).toBe(long);
   });
 
   it("CA3: la huella es la misma que la de Property, y dos líneas idénticas no colisionan", () => {

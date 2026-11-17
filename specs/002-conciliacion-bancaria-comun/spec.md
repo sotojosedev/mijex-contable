@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Estado | Aprobada («sigue con la siguiente fase», 2026-11-17) · en curso |
+| Estado | Aprobada · implementada y conectada en HS y Property (2026-11-17) |
 | Origen | Spec 001 §2: HS (`bankReconciliation.ts`) y Property (`bankStatement.ts`, `platformReconciliationMath.ts`) tienen dos lectores de CSV y dos motores de casado |
 | Reglas | R-CORE-006 (lectura exacta del extracto), R-CORE-007 (casado automático solo si es inequívoco) |
 | Referencias | REF-DEC-005: comportamiento vigente aprobado por el dueño (Property spec 034, decisión 2026-10-30; HS conciliación con ventana de ±3 días) |

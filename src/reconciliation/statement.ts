@@ -88,7 +88,9 @@ function fingerprint(accountId: string, m: { bookedOn: string; amount: Minor; de
   return "csv:" + createHash("sha256").update([accountId, m.bookedOn, formatMinor(m.amount), m.description, m.reference ?? "", occurrence].join("|")).digest("hex").slice(0, 32);
 }
 
-export function parseBankStatementCsv(csv: string, options: { readonly accountId: string }): StatementResult {
+export function parseBankStatementCsv(csv: string, options: { readonly accountId: string; readonly requireDescription?: boolean | undefined }): StatementResult {
+  // Property exige concepto (por defecto); HS admite líneas y extractos sin él.
+  const requireDescription = options.requireDescription ?? true;
   const lines = csv.replace(/^\uFEFF/, "").split(/\r?\n/);
   const headerIndex = lines.findIndex((l) => l.trim() !== "");
   if (headerIndex < 0) return { movements: [], errors: [{ line: 1, message: "El fichero está vacío." }] };
@@ -97,7 +99,7 @@ export function parseBankStatementCsv(csv: string, options: { readonly accountId
   const header = splitLine(first, sep).map(strip);
   const col = (names: readonly string[]): number => header.findIndex((h) => names.includes(h));
   const idx = { date: col(HEADERS.date), description: col(HEADERS.description), amount: col(HEADERS.amount), debit: col(HEADERS.debit), credit: col(HEADERS.credit), counterparty: col(HEADERS.counterparty), reference: col(HEADERS.reference) };
-  if (idx.date < 0 || idx.description < 0 || (idx.amount < 0 && (idx.debit < 0 || idx.credit < 0))) {
+  if (idx.date < 0 || (requireDescription && idx.description < 0) || (idx.amount < 0 && (idx.debit < 0 || idx.credit < 0))) {
     return { movements: [], errors: [{ line: headerIndex + 1, message: "Cabecera no reconocida: se necesitan columnas de fecha, concepto e importe (o debe y haber)." }] };
   }
   const cell = (cells: string[], i: number): string => (i >= 0 ? (cells[i] ?? "") : "");
@@ -117,13 +119,14 @@ export function parseBankStatementCsv(csv: string, options: { readonly accountId
       const credit = creditRaw === "" ? 0n : parseStatementAmount(creditRaw);
       amount = debit === undefined || credit === undefined ? undefined : credit - (debit < 0n ? -debit : debit);
     }
-    const description = cell(cells, idx.description).slice(0, 300);
-    if (bookedOn === undefined || amount === undefined || description === "") {
+    const description = cell(cells, idx.description);
+    if (bookedOn === undefined || amount === undefined || (requireDescription && description === "")) {
       errors.push({ line: i + 1, message: "No se pudo leer la fecha, el concepto o el importe (hasta 2 decimales)." });
       return;
     }
-    const reference = cell(cells, idx.reference).slice(0, 120) || null;
-    const counterparty = cell(cells, idx.counterparty).slice(0, 200) || null;
+    // Sin recortar: la huella debe coincidir con la de Property; cada app recorta al guardar.
+    const reference = cell(cells, idx.reference) || null;
+    const counterparty = cell(cells, idx.counterparty) || null;
     const key = [bookedOn, amount.toString(), description, reference ?? ""].join("|");
     const occurrence = (seen.get(key) ?? 0) + 1;
     seen.set(key, occurrence);

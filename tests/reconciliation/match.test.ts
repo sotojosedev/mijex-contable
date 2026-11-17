@@ -45,6 +45,14 @@ describe("[R-CORE-007] casado automático inequívoco", () => {
   });
 });
 
+describe("orden de los candidatos", () => {
+  it("a igual puntuación: HS prefiere la fecha más cercana; Property, el destino más antiguo", () => {
+    const ts = [target({ id: "nuevo", date: "2026-10-01" }), target({ id: "viejo", date: "2026-08-01" })];
+    expect(rankCandidates(movement(), ts, { requireIdentification: false }).map((c) => c.targetId)).toEqual(["nuevo", "viejo"]);
+    expect(rankCandidates(movement(), ts, { requireIdentification: true, tieBreak: "oldest" }).map((c) => c.targetId)).toEqual(["viejo", "nuevo"]);
+  });
+});
+
 describe("reparto de un ingreso entre destinos (bigint)", () => {
   const t = (id: string, pending: bigint, currency = "DOP") => target({ id, pending, currency });
   it("acepta un reparto válido y rechaza cada error", () => {

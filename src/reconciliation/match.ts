@@ -10,6 +10,8 @@ export interface MatchPolicy {
   readonly requireIdentification: boolean;
   /** Ventana de días entre el movimiento y el destino; sin ella, no se mira la fecha. */
   readonly windowDays?: number | undefined;
+  /** Desempate a igual puntuación: la fecha más cercana (por defecto, HS) o el destino más antiguo (Property). */
+  readonly tieBreak?: "closest" | "oldest" | undefined;
 }
 
 export interface MatchTarget {
@@ -60,7 +62,7 @@ function mentionsName(text: string, names: readonly string[]): boolean {
   });
 }
 
-/** Destinos posibles, del más probable al menos: importe exacto +40, referencia +60, nombre +30; desempata la fecha más cercana. */
+/** Destinos posibles, del más probable al menos: importe exacto +40, referencia +60, nombre +30; desempate según la política. */
 export function rankCandidates(movement: MatchMovement, targets: readonly MatchTarget[], policy: MatchPolicy): MatchCandidate[] {
   return targets
     .filter((t) => t.currency === movement.currency && t.pending !== 0n && (t.pending > 0n) === (movement.amount > 0n))
@@ -70,10 +72,10 @@ export function rankCandidates(movement: MatchMovement, targets: readonly MatchT
       const byName = mentionsName(movement.text, t.names);
       const distance = days(t.date, movement.bookedOn);
       const inWindow = policy.windowDays === undefined || distance <= policy.windowDays;
-      return { targetId: t.id, exact, byReference, byName, inWindow, score: (exact ? 40 : 0) + (byReference ? 60 : 0) + (byName ? 30 : 0), distance };
+      return { targetId: t.id, exact, byReference, byName, inWindow, score: (exact ? 40 : 0) + (byReference ? 60 : 0) + (byName ? 30 : 0), distance, date: t.date };
     })
-    .sort((a, b) => b.score - a.score || a.distance - b.distance)
-    .map(({ distance: _distance, ...c }) => c);
+    .sort((a, b) => b.score - a.score || (policy.tieBreak === "oldest" ? a.date.localeCompare(b.date) : a.distance - b.distance))
+    .map(({ distance: _distance, date: _date, ...c }) => c);
 }
 
 /** Casado automático: un único candidato claro según la política; si hay empate, ninguno (revisión manual). */
