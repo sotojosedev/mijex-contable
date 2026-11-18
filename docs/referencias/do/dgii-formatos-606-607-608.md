@@ -21,9 +21,19 @@ Extracto verificado el 2026-11-17 a partir de las fuentes oficiales:
 - **Importes:** con punto decimal y centavos.
 - **Plazo:** los primeros 15 días del mes siguiente (art. 8).
 - **Sin operaciones:** se remiten en cero, de forma informativa (art. 8, párr. II).
-- **Comprobantes del detalle:** NCF de 11 posiciones según la norma. Los e-NCF tienen 13; queda
-  **[verificar]** cómo los admite la DGII en estos formatos y si los e-CF, que la DGII ya
-  recibe, siguen remitiéndose.
+- **Comprobantes del detalle:** NCF de serie B de 11 posiciones o e-NCF de serie E de 13
+  (Informe Técnico e-CF §7, REF-DO-032).
+- **e-CF en 606/607:** ninguna fuente oficial los exime.
+  - La NG 07-2018 obliga a todos los contribuyentes (art. 2).
+  - El Informe Técnico e-CF (§8) remite el receptor no electrónico al 606 según la NG 07-18.
+- **Anulación de e-CF:**
+  - Un e-CF enviado no se anula: se corrige con nota de crédito E34 (Informe §10; Formato
+    ANECF §1).
+  - Lo no enviado o no usado se anula por el servicio ANECF.
+  - Si el 608 debe recoger además las anulaciones por ANECF sigue **[verificar]**: ninguna
+    fuente lo dice.
+- **Compras a personas no registradas como contribuyentes:** se emite un Comprobante de Compras
+  (e-CF 41) con retención del 100 % del ITBIS (NG 05-2019, art. 7).
 
 ## 606 — Compras de bienes y servicios (Anexo A; plantilla 2025): 23 campos
 1. RNC o Cédula

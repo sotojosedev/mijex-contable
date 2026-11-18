@@ -23,7 +23,8 @@
 - [x] T14b (fase 1, HS spec 040, aprobada por el usuario) HS deja de llevar plan, saldos e informes: Contabilidad lee de la librería (diario paginado con `countEntries` y `sourcePrefix`). `journal_entries` queda como registro transaccional de hechos (outbox) que la librería replica.
 - [x] T14c 606/607/608 en la librería (`src/reports/do/dgii.ts`, R-DO-201…204), con los formatos verificados en las normas (07-2018, 10-2018, 05-2019), los instructivos y las plantillas oficiales. HS solo aporta los datos. Correcciones por norma: 608 con la fecha de anulación; 607 sin el consumo inferior a RD$250.000. El IR-17 sigue en HS (resumen de liquidaciones, sin formato de envío).
   - [verificar con el asesor o la DGII] e-NCF (13 posiciones) frente al NCF de 11 de la norma, y si los e-CF se siguen remitiendo en 606/607; el 606 de las liquidaciones a técnicos no lleva NCF.
-- [ ] T14d Archivar `ledger_accounts` y el registro de hechos de HS (migración destructiva: aprobación expresa).
+- [x] T14d (HS spec 040 fase 3, aprobada) `ledger_accounts` archivada en `archive.ledger_accounts_hs_20261117` (reversible), sin FK; `postEntry` valida contra el plan de la librería. El registro de hechos se mantiene (outbox).
+- [ ] T15 Comprobante de Compras (e-CF 41) para liquidaciones a técnicos no registrados (NG 05-2019 art. 7): regla fiscal nueva, pendiente de confirmación.
 
 ## Siguientes
 Conciliación común (hecha: spec 002), entidades de organizaciones y comunidades (con sus fuentes).

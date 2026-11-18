@@ -58,6 +58,16 @@ describe("[R-DO-202] 607 — ventas (Anexo B; instructivo 12/2025)", () => {
   });
 });
 
+describe("[R-DO-205] número de comprobante: serie B de 11 posiciones o e-NCF de 13 (Informe Técnico e-CF §7)", () => {
+  it("acepta B (11) y E (13) en el 606, el 607 y el 608; rechaza otras longitudes", () => {
+    expect(buildDgii607({ rnc: "131880738", period: "202610", rows: [{ ...sale, ncf: "B0100000001" }] }).errors).toEqual([]);
+    expect(buildDgii607({ rnc: "131880738", period: "202610", rows: [{ ...sale, ncf: "E3100000000" }] }).errors).toEqual([expect.stringContaining("número de comprobante")]);
+    expect(buildDgii608({ rnc: "131880738", period: "202610", rows: [{ ncf: "B01000000", annulledOn: "2026-10-12", type: "04" }] }).errors).toEqual([expect.stringContaining("número de comprobante")]);
+    expect(buildDgii606({ rnc: "131880738", period: "202610", rows: [{ ...purchase, ncf: "E410000000001", modifiedNcf: "B0100000001" }] }).errors).toEqual([]);
+    expect(buildDgii606({ rnc: "131880738", period: "202610", rows: [{ ...purchase, ncf: "X1" }] }).errors).toEqual([expect.stringContaining("número de comprobante")]);
+  });
+});
+
 describe("[R-DO-204] 608 — anulados (Anexo C, plantilla 2018.2.1)", () => {
   it("3 campos: comprobante, fecha de la anulación y tipo (tabla oficial 01–10)", () => {
     const f = buildDgii608({ rnc: "131880738", period: "202610", rows: [{ ncf: "E310000000009", annulledOn: "2026-10-12", type: "04" }] });

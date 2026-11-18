@@ -81,6 +81,14 @@ export interface Dgii608Row {
 }
 
 const amount = (v: Minor): string => formatMinor(v);
+
+/**
+ * Número de comprobante: NCF de serie B (11 posiciones) o e-NCF de serie E (13; Informe Técnico e-CF
+ * §7). En el comprobante modificado del 606/607 también se admite el NCF anterior a mayo de 2018 (19).
+ */
+const NCF = /^(B\d{10}|E\d{12})$/;
+const MODIFIED_NCF = /^(B\d{10}|E\d{12}|[A-Z]\d{18})$/;
+const validNcf = (ncf: string, modified = false): boolean => (modified ? ncf === "" || MODIFIED_NCF.test(ncf) : NCF.test(ncf));
 const ymd = (d: CivilDate): string => d.replaceAll("-", "");
 
 function validDate(d: string): boolean {
@@ -120,6 +128,7 @@ export function buildDgii606(input: { readonly rnc: string; readonly period: str
     if (!validDate(r.issuedOn) || (r.paidOn !== "" && !validDate(r.paidOn))) errors.push(`${at}: fecha no válida`);
     if (r.isrWithheld > 0n && !(DGII_CODES.isrRetentionType as readonly string[]).includes(r.isrRetentionType)) errors.push(`${at}: falta el tipo de retención de ISR`);
     if (r.itbisToCost > r.itbisBilled) errors.push(`${at}: el ITBIS llevado al costo supera el facturado`);
+    if (!validNcf(r.ncf) || !validNcf(r.modifiedNcf, true)) errors.push(`${at}: número de comprobante no válido (B de 11 o e-NCF de 13 posiciones)`);
     return [
       r.taxId, id ?? "", r.purchaseType, r.ncf, r.modifiedNcf, validDate(r.issuedOn) ? ymd(r.issuedOn) : "", r.paidOn && validDate(r.paidOn) ? ymd(r.paidOn) : "",
       amount(r.services), amount(r.goods), amount(r.services + r.goods), amount(r.itbisBilled), amount(r.itbisWithheld), amount(r.itbisProportional), amount(r.itbisToCost),
@@ -142,6 +151,7 @@ export function buildDgii607(input: { readonly rnc: string; readonly period: str
     if (!(DGII_CODES.incomeType as readonly string[]).includes(r.incomeType)) errors.push(`${at}: tipo de ingreso no válido`);
     if (!validDate(r.issuedOn) || (r.withheldOn !== "" && !validDate(r.withheldOn))) errors.push(`${at}: fecha no válida`);
     if ((r.itbisWithheldByThirdParty > 0n || r.isrWithheldByThirdParty > 0n) && r.withheldOn === "") errors.push(`${at}: una retención exige la fecha de retención`);
+    if (!validNcf(r.ncf) || !validNcf(r.modifiedNcf, true)) errors.push(`${at}: número de comprobante no válido (B de 11 o e-NCF de 13 posiciones)`);
     const p = r.payments;
     const total = r.billed + r.itbisBilled + r.selectiveTax + r.otherTaxes + r.legalTip;
     if (p.cash + p.transfer + p.card + p.credit + p.giftCards + p.barter + p.other !== total) errors.push(`${at}: las formas de cobro no suman el total del comprobante`);
@@ -163,6 +173,7 @@ export function buildDgii608(input: { readonly rnc: string; readonly period: str
     const at = `registro ${String(i + 1)}`;
     if (!(DGII_CODES.annulmentType as readonly string[]).includes(r.type)) errors.push(`${at}: tipo de anulación no válido`);
     if (!validDate(r.annulledOn)) errors.push(`${at}: fecha de anulación no válida`);
+    if (!validNcf(r.ncf)) errors.push(`${at}: número de comprobante no válido (B de 11 o e-NCF de 13 posiciones)`);
     return [r.ncf, validDate(r.annulledOn) ? ymd(r.annulledOn) : "", r.type];
   });
   return file("608", input.rnc, input.period, head, lines, errors);
