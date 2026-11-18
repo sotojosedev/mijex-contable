@@ -13,7 +13,11 @@ export type LedgerErrorCode =
   | "EMPTY_ENTRY"
   | "ENTRY_NOT_FOUND"
   | "ALREADY_REVERSED"
-  | "CANNOT_REVERSE_REVERSAL";
+  | "CANNOT_REVERSE_REVERSAL"
+  // Spec 003: registro de operaciones y obligaciones fiscales.
+  | "IDEMPOTENCY_CONFLICT"
+  | "INVALID_LINK"
+  | "OBLIGATION_UNDETERMINED";
 
 /** Error tipado de la librería contable; `details` nunca lleva secretos ni datos personales. */
 export class LedgerError extends Error {

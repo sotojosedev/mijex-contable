@@ -6,3 +6,18 @@ export * from "./reconciliation/index.js";
 export * from "./frameworks/index.js";
 export { buildDgii606, buildDgii607, buildDgii608, DGII_CODES, includeIn607, type DgiiFile, type Dgii606Row, type Dgii607Row, type Dgii608Row } from "./reports/do/dgii.js";
 export { buildIr17Summary, withholdingsOfPeriod, type Ir17Summary } from "./reports/do/withholdings.js";
+export {
+  assertAutomaticIssuance,
+  createMemoryOperationsStore,
+  createOperationsRegister,
+  exportOperationsCsv,
+  resolveObligation,
+  type ObligationProfile,
+  type ObligationQuery,
+  type ObligationStatus,
+  type OperationInput,
+  type OperationKind,
+  type OperationRecord,
+  type OperationsRegister,
+  type OperationsStore,
+} from "./operations/index.js";

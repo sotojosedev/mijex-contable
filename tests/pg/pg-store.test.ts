@@ -4,6 +4,8 @@ import { createLedger } from "../../src/core/ledger.js";
 import { ledgerContract } from "../contract/ledger.contract.js";
 import { installFramework, MIJEX_EVENTS, MIJEX_FRAMEWORKS } from "../../src/frameworks/index.js";
 import { resetDatabase, testPool } from "./pg-env.js";
+import { createPgOperationsStore } from "../../src/persistence/pg/operations-store.js";
+import { operationsContract } from "../contract/operations.contract.js";
 
 const pool = testPool();
 afterAll(() => pool.end());
@@ -11,6 +13,21 @@ afterAll(() => pool.end());
 ledgerContract("PostgreSQL", async () => {
   await resetDatabase(pool);
   return { store: createPgLedgerStore({ pool }) };
+});
+
+operationsContract("PostgreSQL", async () => {
+  await resetDatabase(pool);
+  return createPgOperationsStore({ pool });
+});
+
+describe("[R-CORE-012] PostgreSQL: el registro de operaciones es de solo inserción", () => {
+  beforeEach(() => resetDatabase(pool));
+  it("no se edita ni se borra", async () => {
+    const store = createPgOperationsStore({ pool });
+    const r = await store.insert({ id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e01", organizationId: "org-a", kind: "INVOICE", occurredOn: "2026-11-10", amount: 100n, currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "1" }, links: [], origin: "AUTOMATIC", recordedBy: "system" });
+    await expect(pool.query("UPDATE contable.operation_record SET amount = 1 WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
+    await expect(pool.query("DELETE FROM contable.operation_record WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
+  });
 });
 
 // Garantías que da la base aunque alguien escriba sin la librería.
