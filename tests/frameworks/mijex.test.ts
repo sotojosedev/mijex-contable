@@ -28,8 +28,9 @@ const SAMPLE: Record<string, Record<string, bigint>> = {
   OrgStatementCreditApplied: { amount: 1_000n },
   OrgStatementPaid: { bank: 50_000n, gateway: 0n, cash: 0n, total: 50_000n },
   MaterialsSold: { gross: 11_800n, base: 10_000n, tax: 1_800n },
-  PurchaseInvoiced: { subtotal: 10_000n, tax: 1_800n, total: 11_800n },
+  PurchaseInvoiced: { subtotal: 10_000n, tax: 1_800n, total: 11_800n, itbisWithheld: 0n },
   PurchasePaid: { amount: 11_800n },
+  SupplierPassThroughPaid: { amount: 11_800n },
 };
 
 async function ledgerWith(fw: FrameworkData) {
@@ -93,6 +94,26 @@ describe("marcos de MIJEX como datos", () => {
     }
   });
 
+  it("[R-CORE-009] suplido: el pago al proveedor por cuenta del cliente sale de los fondos de terceros, sin ingreso, gasto ni impuesto (LIVA art. 78.Tres.3.º)", async () => {
+    for (const fw of MIJEX_FRAMEWORKS) {
+      const { ledger, entity } = await ledgerWith(fw);
+      await ledger.post({ entityId: entity.id, type: "PaymentVerified", source: { system: "hs", id: "c1" }, name: "verified", occurredOn: "2026-11-10", currency: entity.currency, amounts: { bank: 11_800n, gateway: 0n, cash: 0n, creditApplied: 0n, total: 11_800n } });
+      await ledger.post({ entityId: entity.id, type: "SupplierPassThroughPaid", source: { system: "hs", id: "po1" }, name: "paid", occurredOn: "2026-11-11", currency: entity.currency, amounts: { amount: 11_800n } });
+      const tb = await ledger.trialBalance(entity.id, { to: "2026-12-31" });
+      expect(tb.rows.filter((r) => r.type === "REVENUE" || r.type === "EXPENSE").every((r) => r.balance === 0n), fw.framework).toBe(true);
+      const clientFunds = fw.accounts.find((x) => x.role === "CLIENT_FUNDS")?.code;
+      const bank = fw.accounts.find((x) => x.role === "BANK")?.code;
+      expect(tb.rows.find((r) => r.account === clientFunds)?.balance ?? 0n).toBe(0n);
+      expect(tb.rows.find((r) => r.account === bank)?.balance ?? 0n).toBe(0n);
+    }
+  });
+
+  it("[R-DO-302] compra con E41 de MIJEX: el 100 % del ITBIS va a la cuenta de ITBIS retenido y al vendedor se le debe la base", async () => {
+    const { ledger, entity } = await ledgerWith(DO_NIIF_PYMES);
+    const { entry } = await ledger.post({ entityId: entity.id, type: "PurchaseInvoiced", source: { system: "hs", id: "po41" }, name: "invoiced", occurredOn: "2026-11-18", currency: "DOP", amounts: { subtotal: 100_000n, tax: 18_000n, total: 100_000n, itbisWithheld: 18_000n } });
+    expect(entry.lines.map((l) => [l.account, l.debit, l.credit])).toEqual([["5200", 100_000n, 0n], ["1160", 18_000n, 0n], ["2160", 0n, 100_000n], ["2140", 0n, 18_000n]]);
+  });
+
   it("[R-ES-104] en España una retención de ISR o ITBIS no tiene cuenta: el asiento no cuadra y se rechaza", async () => {
     const { ledger, entity } = await ledgerWith(ES_PGC_PYMES);
     await expect(ledger.post({ entityId: entity.id, type: "PayoutApproved", source: { system: "hs", id: "p1" }, name: "approved", occurredOn: "2026-11-10", currency: "EUR", amounts: { total: 5_000n, commissionTax: 2_700n, isr: 300n, itbis: 0n, clientWithheld: 2_000n } })).rejects.toMatchObject({ code: "UNBALANCED" });
@@ -129,7 +150,7 @@ describe("cuenta de resultados con los marcos de MIJEX", () => {
       const post = (type: string, id: string, amounts: Record<string, bigint>) => ledger.post({ entityId: entity.id, type, source: { system: "hs", id }, name: "n", occurredOn: "2026-11-10", currency: entity.currency, amounts });
       await post("ServiceSettledEmployee", "s1", { gross: 118_000n, labor: 100_000n, tax: 18_000n, bonus: 5_000n });
       await post("MaterialsSold", "m1", { gross: 11_800n, base: 10_000n, tax: 1_800n });
-      await post("PurchaseInvoiced", "c1", { subtotal: 6_000n, tax: 1_080n, total: 7_080n });
+      await post("PurchaseInvoiced", "c1", { subtotal: 6_000n, tax: 1_080n, total: 7_080n, itbisWithheld: 0n });
       const pl = await ledger.incomeStatement(entity.id, { from: "2026-11-01", to: "2026-11-30" });
       expect({ gross: pl.grossRevenue, net: pl.netRevenue, cos: pl.costOfSales.map((l) => l.amount).sort(), profit: pl.grossProfit, net2: pl.netIncome }, fw.framework)
         .toEqual({ gross: 110_000n, net: 110_000n, cos: [5_000n, 6_000n].sort(), profit: 99_000n, net2: 99_000n });

@@ -61,7 +61,10 @@ export const MIJEX_EVENTS: readonly EventDefinition[] = [
   { type: "ClientCreditRefunded", description: "Saldo a favor devuelto al cliente", lines: [D("CLIENT_CREDIT", "amount"), C("BANK", "amount")] },
   { type: "OrgStatementCreditApplied", description: "Saldo a favor aplicado a un estado de cuenta de organización", lines: [D("CLIENT_CREDIT", "amount"), C("CLIENT_FUNDS", "amount")] },
   { type: "OrgStatementPaid", description: "Estado de cuenta de organización pagado", lines: [D("BANK", "bank"), D("GATEWAY", "gateway"), D("CASH_WITH_TECHS", "cash"), C("CLIENT_FUNDS", "total")] },
-  { type: "MaterialsSold", description: "Materiales vendidos por MIJEX (con su impuesto)", lines: [D("CLIENT_FUNDS", "gross"), C("MATERIALS_REVENUE", "base"), C("SALES_TAX", "tax")] },
-  { type: "PurchaseInvoiced", description: "Factura de proveedor de materiales", lines: [D("COST_OF_MATERIALS", "subtotal"), D("PURCHASE_TAX", "tax"), C("AP_SUPPLIERS", "total")] },
+  // R-CORE-009 (REF-DEC-007): solo la reventa con margen es venta propia; el suplido no.
+  { type: "MaterialsSold", description: "Reventa de materiales por MIJEX con margen (con su impuesto sobre el precio entero)", lines: [D("CLIENT_FUNDS", "gross"), C("MATERIALS_REVENUE", "base"), C("SALES_TAX", "tax")] },
+  // R-DO-302: con un E41 de MIJEX, el 100 % del ITBIS se retiene (a la DGII) y al vendedor se le debe la base.
+  { type: "PurchaseInvoiced", description: "Factura de proveedor de materiales (o E41 de MIJEX con el ITBIS retenido)", lines: [D("COST_OF_MATERIALS", "subtotal"), D("PURCHASE_TAX", "tax"), C("AP_SUPPLIERS", "total"), C("ITBIS_WITHHELD", "itbisWithheld")] },
   { type: "PurchasePaid", description: "Pago a proveedor", lines: [D("AP_SUPPLIERS", "amount"), C("BANK", "amount")] },
+  { type: "SupplierPassThroughPaid", description: "Suplido: pago a un proveedor por cuenta y orden del cliente (fondos de terceros, sin ingreso ni gasto)", lines: [D("CLIENT_FUNDS", "amount"), C("BANK", "amount")] },
 ];
