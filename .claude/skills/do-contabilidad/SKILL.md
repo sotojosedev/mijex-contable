@@ -107,7 +107,7 @@ anteriores a esa fecha.
 
 | Concepto (pagado a persona física) | Antes | Desde 01/07/2026 | Carácter | Fuente | Nivel |
 |---|---|---|---|---|---|
-| Alquiler de bienes muebles o inmuebles | 10 % | **15 %** | Pago único y definitivo | REF-DO-009, REF-DO-008 | C |
+| Alquiler de bienes muebles o inmuebles | 10 % | **15 %** | `[verificar]`: el CT consolidado (A) dice «pago a cuenta»; la ayuda (C) decía «pago único y definitivo». Confirmar con la Ley 30-26 | REF-DO-009, REF-DO-008 | C |
 | Honorarios, comisiones y servicios profesionales sin dependencia | 10 % | **15 %** | Pago a cuenta | REF-DO-008 | C |
 | Servicios técnicos (albañilería, plomería, limpieza, pintura, carpintería, fumigación, transporte…) | 2 % efectivo | **3 % efectivo** (15 % sobre una renta presunta del 20 %) | Pago a cuenta | REF-DO-008, Reglamento 139-98 art. 70 | C |
 | Pagos al exterior: regalías | — | 15 % | — | Ley 30-26 art. 21 (REF-DO-003) | A |
