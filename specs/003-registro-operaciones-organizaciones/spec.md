@@ -62,3 +62,35 @@
 - Los perfiles con obligaciones `REQUIRED` o `NOT_REQUIRED` reales, que necesitan su referencia
   oficial por tipo de organización y país. Hasta tenerla, todos quedan `UNDETERMINED`, que bloquea
   la emisión automática (requisito 6).
+
+## Integración en Property (propuesta, pendiente de aprobación; REF-DEC-009 condición 8)
+Lo que ya existe en Property y se respeta:
+- **Emisión automática** (`fiscalBridge.issuePendingWithFiscalCore`): facturas `ARRIENDO`,
+  `COMUNIDAD` y `OTRO` por organización o por propietario representado.
+- **Reglas fiscales de alquiler** (`RentalTaxRule`): son versiones; la validación profesional y la
+  activación son estados separados.
+- **Retención de facturas:** las facturas sin regla lista quedan retenidas
+  (`Invoice.fiscalHold = HELD`) y se liberan al validar (`rentalTaxIssuance.ts`).
+- **Tipos de organización:** `ADMINISTRADOR`, `INMOBILIARIA`, `PROPIETARIO`, `HOTEL` y `OTRO`.
+
+Cambios propuestos (no alteran el comportamiento actual en desarrollo):
+1. **Catálogo de Property** (datos, R-PROP-0xx): una entrada por país, tipo de organización y tipo
+   de factura (`ARRIENDO`, `COMUNIDAD`, `OTRO`), con el tratamiento actual.
+   - Estado `APPROVED_PENDING_VERIFICATION` y la referencia de la spec de Property que lo aprobó.
+   - La validación profesional de `RentalTaxRule` cuenta como `VERIFIED` solo si la regla lleva
+     una referencia normativa.
+2. **Antes de `fiscal.issue`, `decideFiscalIssuance`** para esa factura:
+   - `ISSUE`: igual que hoy.
+   - `NO_FISCAL_DOCUMENT`: no se emite y queda registrado.
+   - `MANUAL_REVIEW`: se reutiliza `fiscalHold = HELD` con `fiscalHoldReason` = el motivo de la
+     decisión. Solo afecta a esa factura: el cobro, el registro y el resto siguen.
+3. **Bandera `FISCAL_RULE_GATE`:**
+   - En desarrollo y pruebas está activa, y las reglas aprobadas emiten, así que nada cambia.
+   - En producción solo se activa con tu aprobación. Al activarla, lo que no esté `VERIFIED` pasa
+     a revisión manual (condición 4).
+4. **Registro de operaciones:**
+   - las facturas, los recibos de comunidad, los cobros (`PaymentTransaction`) y los gastos
+     (`Expense`) generan registros automáticos con sus enlaces;
+   - los documentos externos se aportan a mano;
+   - se exporta el CSV por organización.
+   - Se aplica la migración `contable` en la base de Property.

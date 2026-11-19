@@ -132,41 +132,68 @@ export function exportOperationsCsv(records: readonly OperationRecord[]): string
   return [HEADER.join(";"), ...lines].join("\r\n");
 }
 
-// --- Obligaciones fiscales por tipo de organización (R-CORE-014) ---
+// --- Catálogo de reglas fiscales y decisión de emisión (R-CORE-014, REF-DEC-009) ---
 
-export type ObligationStatus = "REQUIRED" | "NOT_REQUIRED" | "UNDETERMINED";
+/**
+ * VERIFIED: contrastada con una fuente normativa aplicable. APPROVED_PENDING_VERIFICATION: aprobada
+ * funcionalmente por el usuario, sin verificación normativa (no basta en producción).
+ * UNDETERMINED: no hay regla suficiente para decidir el tratamiento.
+ */
+export type RuleValidation = "VERIFIED" | "APPROVED_PENDING_VERIFICATION" | "UNDETERMINED";
 
-export interface ObligationProfile {
+/** Tratamiento fiscal de la operación: con documento fiscal o sin él (no toda cuota o alquiler se factura). */
+export type FiscalTreatment = "FISCAL_INVOICE" | "NO_FISCAL_DOCUMENT" | (string & {});
+
+export interface FiscalRule {
+  readonly ruleId: string;
+  readonly version: number;
   readonly country: string;
+  readonly jurisdiction: string;
   readonly organizationType: string;
+  readonly operationType: string;
+  readonly treatment: FiscalTreatment;
+  readonly reference?: string | undefined;
+  readonly validation: RuleValidation;
   readonly validFrom: CivilDate;
   readonly validTo?: CivilDate | undefined;
-  readonly obligations: readonly { readonly code: string; readonly status: ObligationStatus; readonly ruleId?: string | undefined; readonly reference?: string | undefined }[];
 }
 
-export interface ObligationQuery {
+export interface IssuanceQuery {
   readonly country: string;
   readonly organizationType: string;
-  readonly obligation: string;
+  readonly operationType: string;
   readonly on: CivilDate;
+  /** En producción solo emite una regla VERIFIED con referencia; en desarrollo y pruebas, también la aprobada. */
+  readonly deployment: "PRODUCTION" | "NON_PRODUCTION";
+  /** Datos esenciales que faltan para determinar el tratamiento (p. ej. identificación fiscal del comprador). */
+  readonly missingData: readonly string[];
+}
+
+export type IssuanceReason = "RULE_APPLIES" | "NO_RULE" | "RULE_UNDETERMINED" | "RULE_NOT_VERIFIED" | "MISSING_DATA";
+
+export interface IssuanceDecision {
+  /** ISSUE: emitir; NO_FISCAL_DOCUMENT: la operación no lleva documento fiscal; MANUAL_REVIEW: solo esta emisión queda retenida. */
+  readonly action: "ISSUE" | "NO_FISCAL_DOCUMENT" | "MANUAL_REVIEW";
+  readonly reason: IssuanceReason;
+  readonly ruleId?: string | undefined;
+  readonly ruleVersion?: number | undefined;
+  readonly validation?: RuleValidation | undefined;
+  readonly reference?: string | undefined;
+  readonly missingData?: readonly string[] | undefined;
 }
 
 /**
- * Estado de una obligación en una fecha. Sin perfil vigente, sin la obligación, o con un estado
- * determinado pero sin regla y referencia oficial: UNDETERMINED (nunca se supone).
+ * Decide la emisión fiscal de UNA operación. Nunca bloquea el registro económico, los cobros ni los
+ * pagos: solo dice si este documento fiscal se emite, no se emite o espera revisión manual.
  */
-export function resolveObligation(profiles: readonly ObligationProfile[], q: ObligationQuery): { status: ObligationStatus; ruleId?: string; reference?: string } {
-  const profile = profiles
-    .filter((p) => p.country === q.country && p.organizationType === q.organizationType && p.validFrom <= q.on && (p.validTo === undefined || q.on < p.validTo))
-    .sort((a, b) => b.validFrom.localeCompare(a.validFrom))[0];
-  const o = profile?.obligations.find((x) => x.code === q.obligation);
-  if (!o || o.status === "UNDETERMINED" || !o.ruleId || !o.reference) return { status: "UNDETERMINED" };
-  return { status: o.status, ruleId: o.ruleId, reference: o.reference };
-}
-
-/** R-CORE-014: la emisión automática exige la obligación determinada; si no, revisión manual. */
-export function assertAutomaticIssuance(profiles: readonly ObligationProfile[], q: ObligationQuery): void {
-  if (resolveObligation(profiles, q).status === "UNDETERMINED") {
-    throw new LedgerError("OBLIGATION_UNDETERMINED", "Obligación fiscal no determinada para este tipo de organización: la emisión automática queda en revisión manual", { ...q });
-  }
+export function decideFiscalIssuance(catalog: readonly FiscalRule[], q: IssuanceQuery): IssuanceDecision {
+  const rule = catalog
+    .filter((r) => r.country === q.country && r.organizationType === q.organizationType && r.operationType === q.operationType && r.validFrom <= q.on && (r.validTo === undefined || q.on < r.validTo))
+    .sort((a, b) => b.validFrom.localeCompare(a.validFrom) || b.version - a.version)[0];
+  if (!rule) return { action: "MANUAL_REVIEW", reason: "NO_RULE" };
+  const ref = { ruleId: rule.ruleId, ruleVersion: rule.version, validation: rule.validation, reference: rule.reference };
+  if (rule.validation === "UNDETERMINED") return { action: "MANUAL_REVIEW", reason: "RULE_UNDETERMINED", ...ref };
+  if (q.deployment === "PRODUCTION" && (rule.validation !== "VERIFIED" || !rule.reference)) return { action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED", ...ref };
+  if (q.missingData.length > 0) return { action: "MANUAL_REVIEW", reason: "MISSING_DATA", missingData: [...q.missingData], ...ref };
+  return { action: rule.treatment === "NO_FISCAL_DOCUMENT" ? "NO_FISCAL_DOCUMENT" : "ISSUE", reason: "RULE_APPLIES", ...ref };
 }

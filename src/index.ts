@@ -7,14 +7,16 @@ export * from "./frameworks/index.js";
 export { buildDgii606, buildDgii607, buildDgii608, DGII_CODES, includeIn607, type DgiiFile, type Dgii606Row, type Dgii607Row, type Dgii608Row } from "./reports/do/dgii.js";
 export { buildIr17Summary, withholdingsOfPeriod, type Ir17Summary } from "./reports/do/withholdings.js";
 export {
-  assertAutomaticIssuance,
   createMemoryOperationsStore,
   createOperationsRegister,
+  decideFiscalIssuance,
   exportOperationsCsv,
-  resolveObligation,
-  type ObligationProfile,
-  type ObligationQuery,
-  type ObligationStatus,
+  type FiscalRule,
+  type FiscalTreatment,
+  type IssuanceDecision,
+  type IssuanceQuery,
+  type IssuanceReason,
+  type RuleValidation,
   type OperationInput,
   type OperationKind,
   type OperationRecord,

@@ -1,32 +1,41 @@
 import { describe, expect, it } from "vitest";
-import { assertAutomaticIssuance, createMemoryOperationsStore, resolveObligation, type ObligationProfile } from "../../src/operations/index.js";
+import { createMemoryOperationsStore, decideFiscalIssuance, type FiscalRule, type IssuanceQuery } from "../../src/operations/index.js";
 import { operationsContract } from "../contract/operations.contract.js";
 
 
 
 operationsContract("memoria", () => Promise.resolve(createMemoryOperationsStore()));
 
-describe("[R-CORE-014] obligaciones fiscales por tipo de organización; sin determinar, no hay emisión automática", () => {
-  const profiles: ObligationProfile[] = [
-    { country: "ES", organizationType: "COMMUNITY", validFrom: "2026-01-01", obligations: [
-      { code: "ISSUE_INVOICES", status: "UNDETERMINED" },
-      { code: "WITHHOLD_IRPF", status: "REQUIRED", ruleId: "R-ES-120", reference: "RIRPF art. 76.1.a (BOE-A-2007-6820)" },
-    ] },
-  ];
+describe("[R-CORE-014] catálogo de reglas fiscales y decisión de emisión por operación (REF-DEC-009)", () => {
+  const rule = (over: Partial<FiscalRule> = {}): FiscalRule => ({
+    ruleId: "R-PROP-001", version: 1, country: "DO", jurisdiction: "DO", organizationType: "PROPERTY_MANAGER", operationType: "COMMERCIAL_RENT",
+    treatment: "FISCAL_INVOICE", validation: "APPROVED_PENDING_VERIFICATION", validFrom: "2026-01-01", ...over,
+  });
+  const q = (over: Partial<IssuanceQuery> = {}): IssuanceQuery => ({ country: "DO", organizationType: "PROPERTY_MANAGER", operationType: "COMMERCIAL_RENT", on: "2026-11-18", deployment: "NON_PRODUCTION", missingData: [], ...over });
 
-  it("una obligación REQUIRED sin referencia oficial no es válida: cuenta como no determinada", () => {
-    const bad: ObligationProfile[] = [{ country: "ES", organizationType: "COMPANY", validFrom: "2026-01-01", obligations: [{ code: "ISSUE_INVOICES", status: "REQUIRED" }] }];
-    expect(resolveObligation(bad, { country: "ES", organizationType: "COMPANY", obligation: "ISSUE_INVOICES", on: "2026-11-18" }).status).toBe("UNDETERMINED");
+  it("desarrollo y pruebas: una regla aprobada pendiente de verificación conserva su comportamiento (emite)", () => {
+    expect(decideFiscalIssuance([rule()], q())).toMatchObject({ action: "ISSUE", ruleId: "R-PROP-001", validation: "APPROVED_PENDING_VERIFICATION" });
   });
 
-  it("devuelve el estado con su regla; sin perfil o sin la obligación, UNDETERMINED", () => {
-    expect(resolveObligation(profiles, { country: "ES", organizationType: "COMMUNITY", obligation: "WITHHOLD_IRPF", on: "2026-11-18" })).toMatchObject({ status: "REQUIRED", ruleId: "R-ES-120" });
-    expect(resolveObligation(profiles, { country: "DO", organizationType: "COMMUNITY", obligation: "ISSUE_INVOICES", on: "2026-11-18" }).status).toBe("UNDETERMINED");
-    expect(resolveObligation(profiles, { country: "ES", organizationType: "COMMUNITY", obligation: "ISSUE_INVOICES", on: "2025-12-31" }).status).toBe("UNDETERMINED");
+  it("producción: la aprobación funcional no basta; solo emite una regla VERIFIED con su referencia", () => {
+    expect(decideFiscalIssuance([rule()], q({ deployment: "PRODUCTION" }))).toMatchObject({ action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED" });
+    expect(decideFiscalIssuance([rule({ validation: "VERIFIED", reference: "Ley 11-92 art. 335" })], q({ deployment: "PRODUCTION" }))).toMatchObject({ action: "ISSUE" });
+    expect(decideFiscalIssuance([rule({ validation: "VERIFIED" })], q({ deployment: "PRODUCTION" }))).toMatchObject({ action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED" });
   });
 
-  it("bloquea la emisión automática si la obligación no está determinada", () => {
-    expect(() => { assertAutomaticIssuance(profiles, { country: "ES", organizationType: "COMMUNITY", obligation: "ISSUE_INVOICES", on: "2026-11-18" }); }).toThrow(expect.objectContaining({ code: "OBLIGATION_UNDETERMINED" }));
-    expect(() => { assertAutomaticIssuance(profiles, { country: "ES", organizationType: "COMMUNITY", obligation: "WITHHOLD_IRPF", on: "2026-11-18" }); }).not.toThrow();
+  it("sin regla, con regla UNDETERMINED o con datos esenciales ausentes: revisión manual solo para esa operación", () => {
+    expect(decideFiscalIssuance([], q())).toMatchObject({ action: "MANUAL_REVIEW", reason: "NO_RULE" });
+    expect(decideFiscalIssuance([rule({ validation: "UNDETERMINED" })], q())).toMatchObject({ action: "MANUAL_REVIEW", reason: "RULE_UNDETERMINED" });
+    expect(decideFiscalIssuance([rule()], q({ missingData: ["buyerTaxId"] }))).toMatchObject({ action: "MANUAL_REVIEW", reason: "MISSING_DATA", missingData: ["buyerTaxId"] });
+  });
+
+  it("no toda operación genera factura: un tratamiento sin documento fiscal no emite ni bloquea", () => {
+    expect(decideFiscalIssuance([rule({ operationType: "COMMUNITY_FEE", treatment: "NO_FISCAL_DOCUMENT", validation: "VERIFIED", reference: "x" })], q({ operationType: "COMMUNITY_FEE", deployment: "PRODUCTION" }))).toMatchObject({ action: "NO_FISCAL_DOCUMENT" });
+  });
+
+  it("usa la versión vigente en la fecha", () => {
+    const rules = [rule(), rule({ version: 2, validFrom: "2027-01-01", treatment: "NO_FISCAL_DOCUMENT" })];
+    expect(decideFiscalIssuance(rules, q({ on: "2026-12-31" })).ruleVersion).toBe(1);
+    expect(decideFiscalIssuance(rules, q({ on: "2027-01-01" }))).toMatchObject({ ruleVersion: 2, action: "NO_FISCAL_DOCUMENT" });
   });
 });
