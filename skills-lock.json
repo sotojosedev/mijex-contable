@@ -13,6 +13,24 @@
       "skillPath": "plugins/development-harness/skills/code-review-typescript/SKILL.md",
       "computedHash": ""
     },
+    "code-security-audit": {
+      "source": "buyoung/skills",
+      "sourceType": "github",
+      "skillPath": "skills/code-security-audit/SKILL.md",
+      "computedHash": "91bb79a8feb40650c2ca81a9d58b6290d1945e2872747d3bfe9a9a9808b44c51"
+    },
+    "diagnosing-bugs": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/diagnosing-bugs/SKILL.md",
+      "computedHash": "801a4ae3b063c0d675705633772faaa724ba2acdd72a965e8525a21dbc2b3ab9"
+    },
+    "domain-modeling": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/domain-modeling/SKILL.md",
+      "computedHash": "b78689833404148c769077355e12dbe5ad996a158a1e21e58ddf169e439d9d8c"
+    },
     "es-autonomous-worker": {
       "source": "openaccountants/openaccountants",
       "commit": "bbab4f1a6d82cace432e6ca8eda89c98ffb1c038",
@@ -37,11 +55,149 @@
       "computedHash": "135d64b5411b05ece02cc647477ba99223949433cb74982b48e25b5fd50e4815",
       "installMode": "copy"
     },
+    "expo-data-fetching": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-data-fetching/SKILL.md",
+      "computedHash": "f09e886fe2bd6dcfaf6094a7ca0d8029c4f4a8cfb3264b5cc23d4a21cb4b2cbe"
+    },
+    "expo-dev-client": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-dev-client/SKILL.md",
+      "computedHash": "41496a5bb64bb753640c3a7de9d58fce81330fbba61f822dabbc04b5f1d7447d"
+    },
+    "expo-native-ui": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-native-ui/SKILL.md",
+      "computedHash": "83cb03d9d8629bc15f4be47c5c326151bc2b1e285fd51bd32c211ebb24e5ff8a"
+    },
+    "expo-overview": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-overview/SKILL.md",
+      "computedHash": "ce82711ca5657c315f2403fa257a5df5fd9adda10d9ad9a6373e28a35862bf35"
+    },
+    "expo-project-structure": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-project-structure/SKILL.md",
+      "computedHash": "00fd1404bb984f058c97296d28dce87c701ea4213b30c864babe24ed6cf12dc0"
+    },
+    "expo-router": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-router/SKILL.md",
+      "computedHash": "9dfdcd75e5f473b468aa3decc0ba1ac7af6641a0a777611ef7173cc4232ddb7c"
+    },
+    "expo-ui": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-ui/SKILL.md",
+      "computedHash": "0e3b343c6e60acab6f4fd4ae6364973f3641ee6de609f3e469bf0347302ead9e"
+    },
+    "expo-upgrade": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-upgrade/SKILL.md",
+      "computedHash": "2e7f5ffbeeb8e4d1e6d8441c30abe9d3817b6ab59bd19106bede903581680144"
+    },
+    "frontend-architecture": {
+      "source": "we-are-singular/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-architecture/SKILL.md",
+      "computedHash": "43901e9b54450ad0118cbc80859a9bdf24a80410166067200510aafc68dd9577"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "computedHash": ""
+    },
+    "postgres-best-practices": {
+      "source": "neondatabase/postgres-skills",
+      "sourceType": "github",
+      "skillPath": "skills/postgres-best-practices/SKILL.md",
+      "computedHash": ""
+    },
+    "prisma-cli": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-cli/SKILL.md",
+      "computedHash": "5867232acad55272d7278be9144b2cb8dcadd500d5a60a89260a2332bf70bd62"
+    },
+    "prisma-client-api": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-client-api/SKILL.md",
+      "computedHash": "a4810158b4b436a69e782e6fab95a0ed5e5e0b2786c2ed00322051d29c4c2b64"
+    },
+    "prisma-compute": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-compute/SKILL.md",
+      "computedHash": "0edcd39a46f395a9c6875b6a272c8eba9a353dbae622c36f48c6f1e4a8523c35"
+    },
+    "prisma-database-setup": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-database-setup/SKILL.md",
+      "computedHash": "79848d903a92d69c3ee173fe26e565381b7b8a2ca66f82da156093e981087ce5"
+    },
+    "prisma-driver-adapter-implementation": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-driver-adapter-implementation/SKILL.md",
+      "computedHash": "6786760df68cf983505e8ea085c2ffa5253a0aa70c7b9ed72031d5f106d7d44f"
+    },
+    "prisma-mongodb-upgrade": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-mongodb-upgrade/SKILL.md",
+      "computedHash": "fbe1fb6c9acd7c50aa8cff222bde8da99dbe74016ecf7c7baecc116c6ed02b24"
+    },
+    "prisma-orm-setup": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-orm-setup/SKILL.md",
+      "computedHash": "a688cf20e8b7b92a97425d2f7f6e071a410f124d6e9f90a3fc7f5e0973e883df"
+    },
+    "prisma-postgres": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-postgres/SKILL.md",
+      "computedHash": "bc15ea262db09a5372b2308d08d553d1437398b8eaf282d6c811db9b22524d85"
+    },
+    "prisma-postgres-setup": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-postgres-setup/SKILL.md",
+      "computedHash": "5a63c97499dfbc9defbd51e3c50d5ae2e67bf48cafe9de9914c6aae594c79d0b"
+    },
+    "prisma-upgrade-v7": {
+      "source": "prisma/skills",
+      "sourceType": "github",
+      "skillPath": "prisma-upgrade-v7/SKILL.md",
+      "computedHash": "f6e8519788f89e6ee404091eba28236af67551e450f100c9595b208d840770d9"
+    },
     "security-audit": {
       "source": "cloudflare/security-audit-skill",
       "sourceType": "github",
       "skillPath": "skills/security-audit/SKILL.md",
-      "computedHash": ""
+      "computedHash": "8513eb3b2c39b8d05ef4f47b32ef4d18280b93a5efb91d8df6272f7435034af5"
+    },
+    "shadcn": {
+      "source": "shadcn-ui/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "4a2992a45f22b87b59627d12802e1c8d3e1dd178b0c3011b584732b8a55ca1c4"
+    },
+    "sleek-design-mobile-apps": {
+      "source": "sleekdotdesign/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/design-mobile-apps/SKILL.md",
+      "computedHash": "07537447f921b777b208b4e48506f25ee3ca4ea05dab2b08161ff057df2303c4"
     },
     "spain-bookkeeping": {
       "source": "openaccountants/openaccountants",
@@ -53,8 +209,15 @@
     },
     "spain-einvoice": {
       "source": "openaccountants/openaccountants",
+      "commit": "bbab4f1a6d82cace432e6ca8eda89c98ffb1c038",
       "sourceType": "github",
       "skillPath": "agent-skills/spain-einvoice/SKILL.md",
+      "computedHash": ""
+    },
+    "spec-review": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/code-review/SKILL.md",
       "computedHash": ""
     },
     "supabase-postgres-best-practices": {
@@ -64,6 +227,24 @@
       "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
       "computedHash": "3eb972c2d7c818e544e35cc33ea8d7147d4d78ae08142ef40037b0fbac7a2505",
       "installMode": "copy"
+    },
+    "tailwind-design-system": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/frontend-mobile-development/skills/tailwind-design-system/SKILL.md",
+      "computedHash": "c807f0c9619e8c389879f55846c2e395956f1073ab6d01a93fbb30b340015ab1"
+    },
+    "tanstack-table": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/tanstack-table/skills/tanstack-table/SKILL.md",
+      "computedHash": "d316da1a2580d9f785e0974a529c15ceff92ec653fd0d6d52b24bbea065d224a"
+    },
+    "test-driven-development": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/test-driven-development/SKILL.md",
+      "computedHash": "2782702b2cf69ace085ed30d067b6f8bfd2d777ad51770fc5bdae9cb5c1b5c04"
     },
     "ts-testing": {
       "source": "johnlindquist/claude-workshop-skills",
@@ -76,6 +257,18 @@
       "sourceType": "github",
       "skillPath": "skills/typescript-pro/SKILL.md",
       "computedHash": ""
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "3219a1944e404ffc14d1d9d6aef6dd2e3855b81387ee0a044ccbfe14d34c2357"
+    },
+    "verification-before-completion": {
+      "source": "obra/superpowers",
+      "sourceType": "github",
+      "skillPath": "skills/verification-before-completion/SKILL.md",
+      "computedHash": "09b0e3a4689c1c38a3b8fc6ef57a1d4165aa33c0013d546dbde9dd348941a319"
     }
   }
 }
