@@ -10,6 +10,7 @@ Librería de contabilidad para MIJEX Property y MIJEX Home Services. Lo fiscal
 - `docs/diseno-tecnico.md`: lo implementado; se actualiza en cada cambio.
 - `docs/reglas/README.md`: catálogo de reglas (`R-…`).
 - `docs/referencias/README.md`: catálogo de fuentes oficiales (`REF-…`).
+- `sdd/README.md`: proceso SDD, constitución, memoria y plantillas de `specs/NNN-slug/`.
 
 ## Rápido
 1. Todo desarrollo = regla + referencia oficial + test (ver AGENTS.md §1).
