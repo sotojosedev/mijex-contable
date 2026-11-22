@@ -95,6 +95,8 @@ vigencia (R-CORE-005).
 | `core/types.ts` | Entidad contable (multiempresa y por país), plan, cuenta, regla de asiento, evento de negocio, asiento, balance |
 | `core/ledger.ts` | `createLedger`: `registerEntity` (idempotente por sistema y ref), `registerChart` + `approveChart` (solo un plan aprobado admite asientos; la versión nueva cierra la anterior), `registerRule`, `post` (R-CORE-002/004), `reverse` (R-CORE-003), `entries`, `trialBalance` |
 | `core/errors.ts` | `LedgerError` con códigos tipados |
+| `operations/index.ts` | Registro de operaciones de organizaciones (spec 003, R-CORE-012/013): `record` idempotente por origen, `recordCorrection` (mismo dato → idempotente; dato distinto → reversión + versión nueva enlazadas), `recordReversal`, `current`, `list`, `trace` y `exportOperationsCsv`. Ocho tipos (con `WITHHOLDING` y `FEE_ACCRUAL`) y cinco naturalezas del importe (`OPERATION_NATURES`) |
+| `operations/fiscal-rules.ts` | Catálogo fiscal en datos (R-CORE-014): versiones por regla y vigencia, `addVersion` (VERIFIED exige referencia; lo pendiente no crea reglas ni cambia tratamientos) y `decideFiscalIssuance` por operación |
 
 ## 5. Persistencia
 
@@ -109,6 +111,11 @@ Esquema `contable` (migración `0001_core.sql`), aplicado con el `migrate` de `f
 - cuadre por asiento con un *constraint trigger* diferido;
 - un solo plan aprobado abierto por marco y una sola regla abierta por evento (índices
   parciales).
+
+Registro de operaciones y catálogo fiscal (spec 003):
+- `0003_operation_records.sql`: `operation_record` de solo inserción (trigger `operation_record_immutable`) y sus enlaces;
+- `0004_operation_record_v2.sql`: naturaleza, versión por origen, reversión única con motivo y los tipos nuevos;
+- `0005_fiscal_rule_catalog.sql`: `fiscal_rule` versionada, de solo inserción.
 
 ## 6. Integraciones
 
@@ -167,3 +174,4 @@ _Ninguna registrada._
 | 2026-11-21 | Property spec 062, cortes 062e y 062f:<br>• Validaciones fiscales por país (F-1 a F-5) como datos, en `/admin/fiscal/validations`. Solo PLATFORM_ADMIN del país, con referencia legal, revisor y fecha; una vigente por tema; auditadas.<br>• Interfaz: pacto BRUTO/NETO y cláusula de traslado; cuota en revisión con «Resolver»; desglose con neto pactado y neto del propietario; Finanzas → Retenciones sobre `WithholdingDecision`.<br>• La retirada de las rutas y registros de la 021/054 queda aplazada por decisión del dueño, hasta auditar las reglas de cada entorno y su equivalencia con la 055. Por eso R-CORE-017 no está completa en Property: en desarrollo ningún país usa aún la fuente única. | Property 062 | — |
 | 2026-11-18 | Property: registro de operaciones de la organización (spec 003 T4a) en `/api/v1/operations`, con lista, trazabilidad, documentos externos y CSV, separado por organización (prueba e2e). La emisión con el catálogo (T4b) espera la aprobación del usuario. | 003 | §3 |
 | 2026-11-19 | Property, spec 003 T4b (aprobada por el usuario): `fiscalRuleCatalog.ts` inventaría el tratamiento actual (ES/DO × tipo de organización × ARRIENDO/COMUNIDAD/OTRO, factura fiscal, APPROVED_PENDING_VERIFICATION) y `issuePendingWithFiscalCore` llama a `decideFiscalIssuance` antes de cada emisión. Un alquiler con `RentalTaxRule` validada, activa y con referencia normativa cuenta como VERIFIED. Si no se emite, esa factura pasa a `fiscalHold = HELD` con el motivo (`fiscalHoldReason`) y la auditoría `INVOICE_FISCAL_HELD`. Bandera `FISCAL_RULE_GATE`: activa fuera de producción, donde nada cambia; en producción solo con `1`. | 003 | §3 |
+| 2026-11-22 | Spec 003, corte 2 (REF-DEC-013): corrección por reversión y naturaleza del importe en la librería (migraciones 0004 y 0005, catálogo fiscal en datos). En Property: orígenes nuevos con naturaleza (recibos, retenciones, pagos fiscales, transferencias, gastos como factura de proveedor), registro al ocurrir y recuperación paginada (`POST /operations/sync`), honorarios devengados por mes cerrado, liquidación guardada al propietario (`owner_settlements`, compensación del honorario enlazada al devengo y a la transferencia), bloqueo de la edición de cuotas con número fiscal (409), pestaña «Registro de operaciones» en Finanzas y tarjeta del catálogo en la consola. 0001–0005 aplicadas en las bases de desarrollo de la rama (`mijex_property`, `mijex_contingencia_dev`) con copia previa; la migración Prisma de la liquidación, solo en la base e2e. | 003 | §4, §5 |

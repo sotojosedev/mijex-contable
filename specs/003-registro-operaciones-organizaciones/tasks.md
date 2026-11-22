@@ -113,21 +113,30 @@ sin la aprobación final de ese paso.
   Implementado el 2026-11-22: un devengo por propietario, mes cerrado y moneda con el importe de
   `computeOwnerStatement` de ese mes. Origen `management-fee:<propietario>:<AAAA-MM>:<moneda>` (por propietario y no
   por contrato: rige una sola versión por mes y la clave no cambia con cada versión). e2e `fee-accrual-003`.
-- [ ] **T034** Propuesta en `liquidacion-guardada.md`, pendiente de aprobación. Presentar la migración Prisma de la liquidación guardada (`OwnerSettlement`, opción A) **antes** de
-  implementarla. Después: la compensación enlazada al devengo y al `Payout`.
+- [x] **T034** Liquidación guardada (`OwnerSettlement`, opción A). Propuesta `liquidacion-guardada.md` aprobada el
+  2026-11-22 tal cual (las 4 preguntas con la opción propuesta). Implementado el 2026-11-22: migración Prisma
+  `20261122100000_spec003_liquidacion_guardada` (CHECK de importes, meses enteros y anulación; triggers de foto
+  inmutable y de coherencia propietario/organización/moneda); `GET|POST /rentals/owners/:id/settlements` y
+  `POST …/:settlementId/void` (auditados); `settlementId` opcional en `POST /finance/payouts`; registro
+  `fee-compensation:<id>` (`COLLECTION`, ingreso propio) enlazado a los devengos de sus meses, y la transferencia
+  pagada enlazada a la compensación. e2e `owner-settlement-003` (comprobado con un mutante sin trigger).
 
 ### D · Interfaz
-- [ ] **T040** Pantalla de operaciones (consulta, naturaleza y exportación) y tarjeta del catálogo para la
-  plataforma.
+- [x] **T040** Pantalla de operaciones (consulta, naturaleza y exportación) y tarjeta del catálogo para la
+  plataforma. Hecho el 2026-11-22: pestaña «Registro de operaciones» en Finanzas (solo AD y PM; periodo, filtro por
+  naturaleza, estado vigente/revertido/reversión, «Actualizar registro» y CSV) y `PlatformFiscalRuleCatalogCard` en la
+  consola (lectura; versión nueva solo PLATFORM_ADMIN). Unit `operationsView.test.ts`. Sin prueba manual en navegador.
 
 ### E · Cambio aparte (aprobado el 2026-11-22)
-- [ ] **T050** Property: `PATCH /invoices/:id` no cambia el importe ni la fecha de una cuota con número fiscal (409);
-  se corrige con la rectificación legal. e2e en rojo primero.
+- [x] **T050** Property: `PATCH /invoices/:id` no cambia el importe ni la fecha de una cuota con número fiscal (409);
+  se corrige con la rectificación legal. e2e en rojo primero. Hecho el 2026-11-22: `fiscal_number_issued` tras las
+  comprobaciones anteriores (que conservan su código, p. ej. `fiscal_record_issued`); el estado sí cambia. e2e
+  `numbered-invoice-edit-003`. Consecuencia: ya no se prorroga el vencimiento de una cuota numerada.
 
 ### F · Verificación y cierre
 - [ ] **T090** Regresión completa (`migraciones-y-regresion.md` §5.2): librería, Property (backend y frontend) y Home
   Services.
-- [ ] **T095** R-CORE-012 y R-CORE-014 ampliadas, REF-DEC-013, `docs/diseno-tecnico.md` e índice de `sdd/`.
+- [x] **T095** R-CORE-012 y R-CORE-014 ampliadas, REF-DEC-013, `docs/diseno-tecnico.md` e índice de `sdd/`.
 
 ## Analyze · trazabilidad
 | Decisión | Tareas | Tests |

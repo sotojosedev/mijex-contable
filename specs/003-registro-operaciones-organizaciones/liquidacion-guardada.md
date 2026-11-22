@@ -1,6 +1,8 @@
-# Spec 003 · T034 · Liquidación guardada al propietario (opción A): propuesta para aprobar
+# Spec 003 · T034 · Liquidación guardada al propietario (opción A)
 
-> Estado: **pendiente de aprobación** (2026-11-22). No se ha escrito ni aplicado ninguna migración.
+> Estado: **aprobada e implementada** (2026-11-22). El dueño aprobó la migración y las 4 preguntas de §4 con la opción
+> propuesta. Migración `20261122100000_spec003_liquidacion_guardada` validada en la base e2e; sin aplicar en desarrollo
+> ni en producción.
 > Decisión previa: opción A aprobada (`migraciones-y-regresion.md` §3). Esta es la migración concreta y su flujo.
 
 ## 1. Problema
@@ -80,3 +82,9 @@ Las filas existentes no cambian: es una tabla nueva. Rollback: `DROP TABLE owner
   registrada y enlazada, anulación revertida, otra organización → 404, roles sin permiso → 403.
 - Prisma: los CHECK y el trigger en la base de pruebas (importe modificado → error).
 - Regresión: liquidaciones (050/051), transferencias, conciliación y el registro (003).
+
+## 6. Implementado (2026-11-22), con dos precisiones
+- Una liquidación cuya transferencia se **rechazó o canceló** puede enlazar otra (si no, quedaría bloqueada para
+  siempre). El trigger lo comprueba en la base, igual que la coherencia de propietario, organización y moneda.
+- La compensación se registra con la fecha de **confirmación** de la liquidación. Antes asegura los devengos de sus
+  meses, aunque caigan fuera del periodo recuperado. La transferencia pagada se enlaza a la compensación.

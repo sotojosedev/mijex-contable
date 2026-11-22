@@ -81,4 +81,4 @@ condition, no es trivial.**
 |---------|--------|------------|-------|
 | [001-inventario-y-nucleo-contable](../specs/001-inventario-y-nucleo-contable/spec.md) | Aprobada (Clarify 2026-11-17) · fase 1a implementada | spec, clarify, plan, tasks | Núcleo de la librería |
 | [002-conciliacion-bancaria-comun](../specs/002-conciliacion-bancaria-comun/spec.md) | Implementada y conectada en HS y Property (2026-11-17) | spec, tasks | **Sin clarify ni plan** |
-| [003-registro-operaciones-organizaciones](../specs/003-registro-operaciones-organizaciones/spec.md) | Núcleo y T4a/T4b hechos; clarify abierto (Q1–Q5) y plan en borrador (2026-11-22) | spec, clarify, plan, tasks | Fallo en el registro de Property (Q3); T5 replanteada frente a la 055 |
+| [003-registro-operaciones-organizaciones](../specs/003-registro-operaciones-organizaciones/spec.md) | Corte 2 implementado (2026-11-22): clarify resuelto (REF-DEC-013), plan, migraciones 0004/0005 y liquidación guardada aprobadas; T001–T050 hechas | spec, clarify, plan, tasks, migraciones-y-regresion, liquidacion-guardada | Producción sin aplicar; T5 (verificar reglas de Property) pendiente con la 055 |
