@@ -28,7 +28,7 @@ export function fiscalRulesContract(name: string, makeStore: () => Promise<Fisca
       const history = await catalog.history(rule().ruleId);
       expect(history.map((r) => [r.version, r.validation])).toEqual([[1, "APPROVED_PENDING_VERIFICATION"], [2, "VERIFIED"]]);
       // La decisión usa la versión mayor con la misma vigencia.
-      const decision = decideFiscalIssuance(await catalog.rules(), { country: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", on: "2026-11-22", deployment: "PRODUCTION", missingData: [] });
+      const decision = decideFiscalIssuance(await catalog.rules(), { country: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", on: "2026-11-22", mode: "LIVE", missingData: [] });
       expect(decision).toMatchObject({ action: "ISSUE", ruleVersion: 2 });
     });
 
@@ -62,7 +62,7 @@ export function fiscalRulesContract(name: string, makeStore: () => Promise<Fisca
       await catalog.seed([rule()], { recordedBy: "system", reason: "carga inicial" });
       await catalog.addVersion(rule({ validFrom: "2027-01-01", treatment: "NO_FISCAL_DOCUMENT", validation: "VERIFIED", reference: "Norma 2027" }), meta);
       const rules = await catalog.rules();
-      const q = { country: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", deployment: "NON_PRODUCTION" as const, missingData: [] };
+      const q = { country: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", mode: "SIMULATION" as const, missingData: [] };
       expect(decideFiscalIssuance(rules, { ...q, on: "2026-12-31" })).toMatchObject({ action: "ISSUE", ruleVersion: 1 });
       expect(decideFiscalIssuance(rules, { ...q, on: "2027-01-01" })).toMatchObject({ action: "NO_FISCAL_DOCUMENT", ruleVersion: 2 });
     });

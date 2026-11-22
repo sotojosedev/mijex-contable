@@ -18,7 +18,7 @@ const rule = (over: Partial<FiscalRule> = {}): FiscalRule => ({
   ruleId: "R-K12/DO/ADMINISTRADOR/COMUNIDAD", version: 1, country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD",
   treatment: "FISCAL_INVOICE", validation: "VERIFIED", reference: "Norma de prueba", validFrom: "2026-01-01", ...over,
 });
-const query = (over: Partial<IssuanceQuery> = {}): IssuanceQuery => ({ country: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", on: "2026-11-22", deployment: "PRODUCTION", missingData: [], ...over });
+const query = (over: Partial<IssuanceQuery> = {}): IssuanceQuery => ({ country: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", on: "2026-11-22", mode: "LIVE", missingData: [], ...over });
 
 describe("[K12] tratamiento fiscal solo con regla validada (R-CORE-014)", () => {
   it("lo indeterminado no se emite de forma automática: sin regla, regla no determinada o datos ausentes → revisión", () => {
@@ -27,7 +27,7 @@ describe("[K12] tratamiento fiscal solo con regla validada (R-CORE-014)", () => 
     expect(decideFiscalIssuance([rule()], query({ missingData: ["buyerTaxId"] }))).toMatchObject({ action: "MANUAL_REVIEW", reason: "MISSING_DATA" });
   });
 
-  it("en producción solo emite una regla VERIFIED con referencia oficial", () => {
+  it("un documento real solo se emite con una regla VERIFIED con referencia oficial", () => {
     expect(decideFiscalIssuance([rule()], query())).toMatchObject({ action: "ISSUE", validation: "VERIFIED", reference: "Norma de prueba" });
     expect(decideFiscalIssuance([rule({ validation: "APPROVED_PENDING_VERIFICATION" })], query())).toMatchObject({ action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED" });
     expect(decideFiscalIssuance([rule({ reference: undefined })], query())).toMatchObject({ action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED" });
@@ -67,7 +67,11 @@ describe("[K12] tratamiento fiscal solo con regla validada (R-CORE-014)", () => 
     expect((await register.list("org-k12")).find((r) => r.id === first.id)).toMatchObject({ amount: 10_000n });
   });
 
-  it.todo("I-K12-1: fuera de producción, una regla pendiente de verificación tampoco emite (hoy emite, REF-DEC-009)");
+  it("I-K12-1 (spec 004a): una regla pendiente nunca genera un documento real; solo se ejecuta en simulación", () => {
+    const pending = rule({ validation: "APPROVED_PENDING_VERIFICATION" });
+    expect(decideFiscalIssuance([pending], query())).toMatchObject({ action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED" });
+    expect(decideFiscalIssuance([pending], query({ mode: "SIMULATION" }))).toMatchObject({ action: "ISSUE", simulated: true });
+  });
   it.todo("I-K12-2: las reglas fiscales viven en @mijex/fiscal-core; esta librería no guarda un catálogo propio");
   it.todo("I-K12-3: quien registra una versión de regla no puede verificarla (aprobación separada)");
   it.todo("I-K12-4: el registro comprueba la procedencia y el estado del resultado fiscal antes de registrarlo");

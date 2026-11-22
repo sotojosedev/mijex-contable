@@ -45,7 +45,7 @@ Detectados al ratificar. Se resuelven con specs aprobadas por el dueño; hasta e
 
 | # | Incumplimiento | Dónde | Choca con |
 |---|----------------|-------|-----------|
-| I-K12-1 | Fuera de producción, una regla del catálogo «aprobada, pendiente de verificación» emite (`decideFiscalIssuance`, test de R-CORE-014). | `src/operations/index.ts` | REF-DEC-009 (decisión anterior del dueño) |
+| I-K12-1 | ~~Fuera de producción, una regla del catálogo «aprobada, pendiente de verificación» emite.~~ **Cerrado** por la spec 004a (2026-11-22): modo LIVE / SIMULATION; REF-DEC-009 actualizada por REF-DEC-015. | `src/operations/index.ts` | — |
 | I-K12-2 | El catálogo de reglas fiscales de la 003 vive en esta librería (esquema `contable`), no en `@mijex/fiscal-core`. Las reglas de alquiler (021/055) viven en Property. | `src/operations/fiscal-rules.ts`, migración 0004/0005; Property | Frontera de K12 |
 | I-K12-3 | Una versión VERIFIED del catálogo solo guarda quién la registró: no hay aprobación separada de la propuesta. | `src/operations/fiscal-rules.ts` | Separación proponer / aprobar |
 | I-K12-4 | El registro de operaciones no comprueba la procedencia ni el estado del resultado fiscal antes de registrarlo. | `src/operations/index.ts` | Validar procedencia y estado |

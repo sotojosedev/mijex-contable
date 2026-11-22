@@ -234,7 +234,7 @@ export function exportOperationsCsv(records: readonly OperationRecord[]): string
 
 /**
  * VERIFIED: contrastada con una fuente normativa aplicable. APPROVED_PENDING_VERIFICATION: aprobada
- * funcionalmente por el usuario, sin verificación normativa (no basta en producción).
+ * funcionalmente por el usuario, sin verificación normativa: nunca basta para un documento real (REF-DEC-015).
  * UNDETERMINED: no hay regla suficiente para decidir el tratamiento.
  */
 export type RuleValidation = "VERIFIED" | "APPROVED_PENDING_VERIFICATION" | "UNDETERMINED";
@@ -261,8 +261,11 @@ export interface IssuanceQuery {
   readonly organizationType: string;
   readonly operationType: string;
   readonly on: CivilDate;
-  /** En producción solo emite una regla VERIFIED con referencia; en desarrollo y pruebas, también la aprobada. */
-  readonly deployment: "PRODUCTION" | "NON_PRODUCTION";
+  /**
+   * LIVE: documento fiscal real, en cualquier entorno; solo con una regla VERIFIED con referencia (K12, REF-DEC-015).
+   * SIMULATION: prueba aislada con datos ficticios; una regla pendiente se ejecuta y la decisión sale `simulated`.
+   */
+  readonly mode: "LIVE" | "SIMULATION";
   /** Datos esenciales que faltan para determinar el tratamiento (p. ej. identificación fiscal del comprador). */
   readonly missingData: readonly string[];
 }
@@ -278,6 +281,8 @@ export interface IssuanceDecision {
   readonly validation?: RuleValidation | undefined;
   readonly reference?: string | undefined;
   readonly missingData?: readonly string[] | undefined;
+  /** Solo en SIMULATION: la decisión no autoriza ningún documento fiscal real. */
+  readonly simulated?: true | undefined;
 }
 
 /**
@@ -290,10 +295,11 @@ export function decideFiscalIssuance(catalog: readonly FiscalRule[], q: Issuance
     .sort((a, b) => b.validFrom.localeCompare(a.validFrom) || b.version - a.version)[0];
   if (!rule) return { action: "MANUAL_REVIEW", reason: "NO_RULE" };
   const ref = { ruleId: rule.ruleId, ruleVersion: rule.version, validation: rule.validation, reference: rule.reference };
-  if (rule.validation === "UNDETERMINED") return { action: "MANUAL_REVIEW", reason: "RULE_UNDETERMINED", ...ref };
-  if (q.deployment === "PRODUCTION" && (rule.validation !== "VERIFIED" || !rule.reference)) return { action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED", ...ref };
-  if (q.missingData.length > 0) return { action: "MANUAL_REVIEW", reason: "MISSING_DATA", missingData: [...q.missingData], ...ref };
-  return { action: rule.treatment === "NO_FISCAL_DOCUMENT" ? "NO_FISCAL_DOCUMENT" : "ISSUE", reason: "RULE_APPLIES", ...ref };
+  const simulated = q.mode === "SIMULATION" ? { simulated: true as const } : {};
+  if (rule.validation === "UNDETERMINED") return { action: "MANUAL_REVIEW", reason: "RULE_UNDETERMINED", ...ref, ...simulated };
+  if (q.mode === "LIVE" && (rule.validation !== "VERIFIED" || !rule.reference?.trim())) return { action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED", ...ref };
+  if (q.missingData.length > 0) return { action: "MANUAL_REVIEW", reason: "MISSING_DATA", missingData: [...q.missingData], ...ref, ...simulated };
+  return { action: rule.treatment === "NO_FISCAL_DOCUMENT" ? "NO_FISCAL_DOCUMENT" : "ISSUE", reason: "RULE_APPLIES", ...ref, ...simulated };
 }
 
 export { createFiscalRuleCatalog, createMemoryFiscalRuleStore, type FiscalRuleCatalog, type FiscalRuleStore, type RuleVersionMeta, type StoredFiscalRule } from "./fiscal-rules.js";
