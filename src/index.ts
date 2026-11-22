@@ -31,4 +31,9 @@ export {
   type OperationRecord,
   type OperationsRegister,
   type OperationsStore,
+  // Spec 004b y 004c (K12).
+  type ReviewMeta,
+  FISCAL_RESULT_CONTRACT_VERSION,
+  type FiscalResultEnvelope,
+  type RecordedFiscalResult,
 } from "./operations/index.js";

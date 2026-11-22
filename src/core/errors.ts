@@ -21,7 +21,13 @@ export type LedgerErrorCode =
   | "CONCURRENT_UPDATE"
   // Spec 004b (K12): quien propone una regla no la revisa; solo se revisa la última propuesta pendiente.
   | "SELF_VERIFICATION"
-  | "STALE_PROPOSAL";
+  | "STALE_PROPOSAL"
+  // Spec 004c (K12): el resultado fiscal no cumple el contrato (procedencia, versión, estado, ámbito, integridad).
+  | "FISCAL_PROVENANCE"
+  | "FISCAL_VERSION"
+  | "FISCAL_STATUS"
+  | "FISCAL_SCOPE"
+  | "FISCAL_INTEGRITY";
 
 /** Error tipado de la librería contable; `details` nunca lleva secretos ni datos personales. */
 export class LedgerError extends Error {

@@ -1,5 +1,5 @@
 import type { Pool } from "pg";
-import type { OperationKind, OperationNature, OperationRecord, OperationsStore } from "../../operations/index.js";
+import type { OperationKind, OperationNature, OperationRecord, OperationsStore, RecordedFiscalResult } from "../../operations/index.js";
 
 // Spec 003: almacén PostgreSQL del registro de operaciones. SQL parametrizado; importes BIGINT
 // leídos como texto y convertidos a bigint (sin pasar por Number).
@@ -23,9 +23,10 @@ interface Row {
   reverses: string | null;
   reason: string | null;
   nature: OperationNature | null;
+  fiscal: RecordedFiscalResult | null;
 }
 
-const COLUMNS = "id, organization_id, kind, to_char(occurred_on, 'YYYY-MM-DD') AS occurred_on, amount::text AS amount, currency, counterparty, document_type, document_number, source_system, source_id, links::text[] AS links, origin, recorded_by, source_version, reverses::text AS reverses, reason, nature";
+const COLUMNS = "id, organization_id, kind, to_char(occurred_on, 'YYYY-MM-DD') AS occurred_on, amount::text AS amount, currency, counterparty, document_type, document_number, source_system, source_id, links::text[] AS links, origin, recorded_by, source_version, reverses::text AS reverses, reason, nature, fiscal";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const toRecord = (r: Row): OperationRecord => ({
@@ -45,6 +46,7 @@ const toRecord = (r: Row): OperationRecord => ({
   reverses: r.reverses,
   reason: r.reason,
   nature: r.nature,
+  fiscal: r.fiscal,
 });
 
 export function createPgOperationsStore(deps: { readonly pool: Pool }): OperationsStore {
@@ -62,11 +64,11 @@ export function createPgOperationsStore(deps: { readonly pool: Pool }): Operatio
     byId: async (id) => (UUID.test(id) ? one(`SELECT ${COLUMNS} FROM contable.operation_record WHERE id = $1`, [id]) : undefined),
     async insert(r) {
       const inserted = await one(
-        `INSERT INTO contable.operation_record (id, organization_id, kind, occurred_on, amount, currency, counterparty, document_type, document_number, source_system, source_id, links, origin, recorded_by, source_version, reverses, reason, nature)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::uuid[], $13, $14, $15, $16::uuid, $17, $18)
+        `INSERT INTO contable.operation_record (id, organization_id, kind, occurred_on, amount, currency, counterparty, document_type, document_number, source_system, source_id, links, origin, recorded_by, source_version, reverses, reason, nature, fiscal, fiscal_definitive)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::uuid[], $13, $14, $15, $16::uuid, $17, $18, $19::jsonb, $20)
          ON CONFLICT DO NOTHING
          RETURNING ${COLUMNS}`,
-        [r.id, r.organizationId, r.kind, r.occurredOn, r.amount.toString(), r.currency, r.counterparty, r.document?.type ?? null, r.document?.number ?? null, r.source.system, r.source.id, r.links, r.origin, r.recordedBy, r.sourceVersion, r.reverses, r.reason, r.nature],
+        [r.id, r.organizationId, r.kind, r.occurredOn, r.amount.toString(), r.currency, r.counterparty, r.document?.type ?? null, r.document?.number ?? null, r.source.system, r.source.id, r.links, r.origin, r.recordedBy, r.sourceVersion, r.reverses, r.reason, r.nature, r.fiscal === null ? null : JSON.stringify(r.fiscal), r.fiscal?.definitive ?? null],
       );
       if (inserted) return inserted;
       // Otro proceso ocupó la misma versión del origen, o ya revirtió ese registro: se devuelve lo que quedó guardado.

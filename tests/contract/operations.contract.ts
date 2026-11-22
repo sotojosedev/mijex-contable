@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { createOperationsRegister, exportOperationsCsv, type OperationInput, type OperationsStore } from "../../src/operations/index.js";
+import { createHash } from "node:crypto";
+import { createOperationsRegister, exportOperationsCsv, type FiscalResultEnvelope, type OperationInput, type OperationsStore } from "../../src/operations/index.js";
 
 const op = (over: Partial<OperationInput> = {}): OperationInput => ({
   organizationId: "org-a", kind: "INVOICE", occurredOn: "2026-11-10", amount: 118_000n, currency: "EUR",
   counterparty: "Propietario 1A", document: { type: "FACTURA", number: "F-1" }, source: { system: "property", id: "inv-1" },
   origin: "AUTOMATIC", recordedBy: "system", ...over,
+});
+
+const content = "contenido canónico del documento F-1";
+const digest = createHash("sha256").update(content).digest("hex");
+const envelope = (over: Partial<FiscalResultEnvelope> = {}): FiscalResultEnvelope => ({
+  contractVersion: 1, provenance: "FISCAL_CORE", documentId: "doc-1", documentNumber: "F-1", issuerId: "issuer-1", organizationId: "org-a", country: "ES",
+  fiscalStatus: "ACTIVE", submissionStatus: "ACCEPTED", integrity: { algorithm: "SHA-256", digest }, ...over,
 });
 
 /** Spec 003: el mismo comportamiento con cualquier almacén (memoria y PostgreSQL). */
@@ -46,12 +54,12 @@ export function operationsContract(name: string, makeStore: () => Promise<Operat
         expect(nov.map((r) => r.source.id)).toEqual(["inv-1"]);
         const csv = exportOperationsCsv(nov);
         // Las columnas anteriores se conservan en el mismo orden; las nuevas van al final (compatible, REF-DEC-013 Q4).
-        expect(csv.split("\r\n")[0]).toBe("fecha;tipo;documento_tipo;documento_numero;contraparte;importe;moneda;origen;enlaces;referencia_origen;naturaleza;version_origen;revierte;motivo");
-        expect(csv.split("\r\n")[1]).toBe("2026-11-10;INVOICE;FACTURA;F-1;Propietario 1A;1180.00;EUR;AUTOMATIC;;property:inv-1;;1;;");
+        expect(csv.split("\r\n")[0]).toBe("fecha;tipo;documento_tipo;documento_numero;contraparte;importe;moneda;origen;enlaces;referencia_origen;naturaleza;version_origen;revierte;motivo;documento_fiscal;fiscal_definitivo");
+        expect(csv.split("\r\n")[1]).toBe("2026-11-10;INVOICE;FACTURA;F-1;Propietario 1A;1180.00;EUR;AUTOMATIC;;property:inv-1;;1;;;;");
       });
 
       it("protege el CSV frente a fórmulas y separadores en los textos", () => {
-        const csv = exportOperationsCsv([{ ...op(), id: "x", counterparty: "=HYPERLINK(1);a", links: [], nature: null, sourceVersion: 1, reverses: null, reason: null }]);
+        const csv = exportOperationsCsv([{ ...op(), id: "x", counterparty: "=HYPERLINK(1);a", links: [], nature: null, sourceVersion: 1, reverses: null, reason: null, fiscal: null }]);
         expect(csv.split("\r\n")[1]).toContain("\"'=HYPERLINK(1);a\"");
       });
     });
@@ -86,8 +94,8 @@ export function operationsContract(name: string, makeStore: () => Promise<Operat
         const original = await reg.record(op({ nature: "OWN_INCOME" }));
         await reg.recordReversal({ system: "property", id: "inv-1" }, { reason: "anulada", recordedBy: "system" });
         const lines = exportOperationsCsv(await reg.list("org-a")).split("\r\n").slice(1);
-        expect(lines).toContain("2026-11-10;INVOICE;FACTURA;F-1;Propietario 1A;1180.00;EUR;AUTOMATIC;;property:inv-1;OWN_INCOME;1;;");
-        expect(lines).toContain(`2026-11-10;INVOICE;FACTURA;F-1;Propietario 1A;-1180.00;EUR;AUTOMATIC;${original.id};property:inv-1;OWN_INCOME;2;${original.id};anulada`);
+        expect(lines).toContain("2026-11-10;INVOICE;FACTURA;F-1;Propietario 1A;1180.00;EUR;AUTOMATIC;;property:inv-1;OWN_INCOME;1;;;;");
+        expect(lines).toContain(`2026-11-10;INVOICE;FACTURA;F-1;Propietario 1A;-1180.00;EUR;AUTOMATIC;${original.id};property:inv-1;OWN_INCOME;2;${original.id};anulada;;`);
       });
     });
 
@@ -174,6 +182,65 @@ export function operationsContract(name: string, makeStore: () => Promise<Operat
       const [a, b] = await Promise.all([reg.record(op()), reg.record(op())]);
       expect(a.id).toBe(b.id);
       expect(await reg.list("org-a")).toHaveLength(1);
+    });
+
+    describe("[K12][R-CORE-012] resultado fiscal: procedencia, versión, estado, ámbito e integridad (spec 004c)", () => {
+      it("un documento de fiscal-core aceptado se registra como definitivo, con su sobre", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const r = await reg.record(op({ fiscal: envelope({ integrity: { algorithm: "SHA-256", digest, content } }) }));
+        expect(r.fiscal).toMatchObject({ provenance: "FISCAL_CORE", documentId: "doc-1", fiscalStatus: "ACTIVE", submissionStatus: "ACCEPTED", definitive: true, integrity: { algorithm: "SHA-256", digest } });
+        expect(r.fiscal && "content" in r.fiscal.integrity).toBe(false);
+        expect((await reg.list("org-a"))[0]?.fiscal?.definitive).toBe(true);
+        expect(exportOperationsCsv(await reg.list("org-a")).split("\r\n")[1]?.endsWith(";doc-1;si")).toBe(true);
+      });
+
+      it("un documento en envío, rechazado o anulado se registra como no definitivo; sin sobre, sin datos fiscales", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const pending = await reg.record(op({ fiscal: envelope({ submissionStatus: "PENDING_SUBMISSION" }) }));
+        const rejected = await reg.record(op({ source: { system: "property", id: "inv-2" }, fiscal: envelope({ submissionStatus: "REJECTED" }) }));
+        const annulled = await reg.record(op({ source: { system: "property", id: "inv-3" }, fiscal: envelope({ fiscalStatus: "ANNULLED" }) }));
+        const plain = await reg.record(op({ source: { system: "property", id: "inv-4" } }));
+        expect([pending, rejected, annulled].map((r) => r.fiscal?.definitive)).toEqual([false, false, false]);
+        expect(plain.fiscal).toBeNull();
+      });
+
+      it("pruebas de rechazo: procedencia, versión, estado, ámbito e integridad", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const cases: [Partial<OperationInput>, string][] = [
+          [{ fiscal: envelope({ provenance: "EXTERNAL" }) }, "FISCAL_PROVENANCE"],
+          [{ fiscal: envelope({ documentId: " " }) }, "FISCAL_PROVENANCE"],
+          [{ fiscal: envelope({ contractVersion: 2 }) }, "FISCAL_VERSION"],
+          [{ fiscal: envelope({ fiscalStatus: "INVENTADO" }) }, "FISCAL_STATUS"],
+          [{ fiscal: envelope({ submissionStatus: "INVENTADO" }) }, "FISCAL_STATUS"],
+          [{ fiscal: envelope({ organizationId: "org-b" }) }, "FISCAL_SCOPE"],
+          [{ fiscal: envelope({ country: "Spain" }) }, "FISCAL_SCOPE"],
+          [{ fiscal: envelope({ documentNumber: "F-9" }) }, "FISCAL_SCOPE"],
+          [{ fiscal: envelope({ integrity: { algorithm: "MD5" as never, digest } }) }, "FISCAL_INTEGRITY"],
+          [{ fiscal: envelope({ integrity: { algorithm: "SHA-256", digest: "abc" } }) }, "FISCAL_INTEGRITY"],
+          [{ fiscal: envelope({ integrity: { algorithm: "SHA-256", digest, content: "otro contenido" } }) }, "FISCAL_INTEGRITY"],
+        ];
+        for (const [over, code] of cases) await expect(reg.record(op(over)), code).rejects.toMatchObject({ code });
+        expect(await reg.list("org-a")).toHaveLength(0);
+      });
+
+      it("un documento aportado a mano puede ser externo; el cobro no necesita sobre y nunca se bloquea", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const external = await reg.record(op({ kind: "EXTERNAL", origin: "MANUAL", recordedBy: "admin-1", source: { system: "manual", id: "ext-1" }, fiscal: envelope({ provenance: "EXTERNAL", documentId: "", submissionStatus: "NOT_SUBMITTED" }) }));
+        expect(external.fiscal).toMatchObject({ provenance: "EXTERNAL", definitive: true });
+        const collection = await reg.record(op({ kind: "COLLECTION", document: null, source: { system: "property", id: "pay-1" } }));
+        expect(collection.fiscal).toBeNull();
+      });
+
+      it("idempotente con el mismo sobre; un cambio de estado fiscal es una corrección (reversión y versión nueva)", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const first = await reg.record(op({ fiscal: envelope({ submissionStatus: "PENDING_SUBMISSION" }) }));
+        expect((await reg.record(op({ fiscal: envelope({ submissionStatus: "PENDING_SUBMISSION" }) }))).id).toBe(first.id);
+        const same = await reg.recordCorrection(op({ fiscal: envelope({ submissionStatus: "PENDING_SUBMISSION" }) }), { reason: "sin cambios", recordedBy: "system" });
+        expect(same.reversal).toBeNull();
+        const { reversal, record } = await reg.recordCorrection(op({ fiscal: envelope({ submissionStatus: "ACCEPTED" }) }), { reason: "Aceptado por la autoridad", recordedBy: "system" });
+        expect(reversal?.reverses).toBe(first.id);
+        expect(record.fiscal).toMatchObject({ submissionStatus: "ACCEPTED", definitive: true });
+      });
     });
   });
 }

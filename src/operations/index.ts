@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { formatMinor } from "@sotojosedev/fiscal-core";
+import { FISCAL_STATUSES, formatMinor, SUBMISSION_STATUSES } from "@sotojosedev/fiscal-core";
+import { createHash } from "node:crypto";
 import { LedgerError } from "../core/errors.js";
 import type { CivilDate, Minor } from "../core/types.js";
 
@@ -33,9 +34,73 @@ export interface OperationInput {
   readonly recordedBy: string;
   /** Opcional (compatible): sin ella el registro queda sin clasificar. */
   readonly nature?: OperationNature | null | undefined;
+  /** Spec 004c (K12): resultado fiscal del documento, verificado antes de registrarlo. Opcional (compatible). */
+  readonly fiscal?: FiscalResultEnvelope | null | undefined;
 }
 
-export interface OperationRecord extends Omit<OperationInput, "links" | "nature"> {
+/** Versión del contrato `FiscalResultEnvelope` que admite esta librería. */
+export const FISCAL_RESULT_CONTRACT_VERSION = 1;
+
+/**
+ * Spec 004c (K12, REF-DEC-015): contrato público y estable del resultado fiscal que se registra. La librería verifica
+ * procedencia, versión, estado, ámbito e integridad; no recalcula impuestos ni interpreta la ley.
+ */
+export interface FiscalResultEnvelope {
+  readonly contractVersion: number;
+  /** FISCAL_CORE: emitido por `@mijex/fiscal-core`. EXTERNAL: aportado a mano (solo con `origin: "MANUAL"`). */
+  readonly provenance: "FISCAL_CORE" | "EXTERNAL";
+  /** Identificador del documento en fiscal-core (obligatorio con FISCAL_CORE). */
+  readonly documentId: string;
+  readonly documentNumber: string;
+  readonly issuerId: string;
+  readonly organizationId: string;
+  readonly country: string;
+  /** Estados tal como los da fiscal-core (`FISCAL_STATUSES`, `SUBMISSION_STATUSES`). */
+  readonly fiscalStatus: string;
+  readonly submissionStatus: string;
+  /** Huella del contenido canónico; si se aporta `content`, se comprueba que coincide. `content` no se guarda. */
+  readonly integrity: { readonly algorithm: "SHA-256"; readonly digest: string; readonly content?: string | undefined };
+}
+
+/** Lo que queda registrado: el sobre sin el contenido y si el resultado es definitivo. */
+export interface RecordedFiscalResult extends Omit<FiscalResultEnvelope, "integrity"> {
+  readonly integrity: { readonly algorithm: "SHA-256"; readonly digest: string };
+  readonly definitive: boolean;
+}
+
+// Clasificación cerrada de los estados de fiscal-core (no de la ley): definitivo = aceptado por la autoridad, o sin
+// obligación de remitir, y documento vigente (no anulado ni sustituido). Lo demás se registra como no definitivo.
+const DEFINITIVE_SUBMISSION: readonly string[] = ["ACCEPTED", "ACCEPTED_WITH_ERRORS", "NOT_SUBMITTED"];
+const DEFINITIVE_FISCAL: readonly string[] = ["ACTIVE", "PARTIALLY_CORRECTED", "CORRECTED"];
+
+function checkFiscal(input: OperationInput): RecordedFiscalResult | null {
+  const f = input.fiscal;
+  if (!f) return null;
+  const fail = (code: "FISCAL_PROVENANCE" | "FISCAL_VERSION" | "FISCAL_STATUS" | "FISCAL_SCOPE" | "FISCAL_INTEGRITY", message: string): never => {
+    throw new LedgerError(code, message, { source: `${input.source.system}:${input.source.id}` });
+  };
+  if (f.contractVersion !== FISCAL_RESULT_CONTRACT_VERSION) fail("FISCAL_VERSION", "Versión del contrato del resultado fiscal no admitida");
+  // El sobre llega de fuera: se comprueba también lo que los tipos ya prometen.
+  const provenance: string = f.provenance;
+  const algorithm: string = f.integrity.algorithm;
+  if (provenance !== "FISCAL_CORE" && provenance !== "EXTERNAL") fail("FISCAL_PROVENANCE", "Procedencia del resultado fiscal desconocida");
+  if (f.provenance === "EXTERNAL" && input.origin !== "MANUAL") fail("FISCAL_PROVENANCE", "Un resultado fiscal externo solo se registra como operación aportada a mano");
+  if (f.provenance === "FISCAL_CORE" && !f.documentId.trim()) fail("FISCAL_PROVENANCE", "Un resultado de fiscal-core exige el identificador de su documento");
+  if (!(FISCAL_STATUSES as readonly string[]).includes(f.fiscalStatus) || !(SUBMISSION_STATUSES as readonly string[]).includes(f.submissionStatus)) {
+    fail("FISCAL_STATUS", "Estado fiscal o de envío desconocido");
+  }
+  if (f.organizationId !== input.organizationId || !/^[A-Z]{2}$/.test(f.country) || !f.issuerId.trim() || (input.document !== null && f.documentNumber !== input.document.number)) {
+    fail("FISCAL_SCOPE", "El resultado fiscal no corresponde a esta organización, país o documento");
+  }
+  if (algorithm !== "SHA-256" || !/^[0-9a-f]{64}$/.test(f.integrity.digest)) fail("FISCAL_INTEGRITY", "Huella del documento ausente o mal formada");
+  if (f.integrity.content !== undefined && createHash("sha256").update(f.integrity.content).digest("hex") !== f.integrity.digest) {
+    fail("FISCAL_INTEGRITY", "La huella no coincide con el contenido del documento");
+  }
+  const { integrity, ...rest } = f;
+  return { ...rest, integrity: { algorithm: integrity.algorithm, digest: integrity.digest }, definitive: DEFINITIVE_SUBMISSION.includes(f.submissionStatus) && DEFINITIVE_FISCAL.includes(f.fiscalStatus) };
+}
+
+export interface OperationRecord extends Omit<OperationInput, "links" | "nature" | "fiscal"> {
   readonly id: string;
   readonly links: readonly string[];
   readonly nature: OperationNature | null;
@@ -45,6 +110,8 @@ export interface OperationRecord extends Omit<OperationInput, "links" | "nature"
   readonly reverses: string | null;
   /** Motivo de la reversión; null en los registros normales. */
   readonly reason: string | null;
+  /** Spec 004c: resultado fiscal verificado; null si la operación no lo trae. */
+  readonly fiscal: RecordedFiscalResult | null;
 }
 
 export interface OperationsStore {
@@ -78,10 +145,19 @@ export function createMemoryOperationsStore(): OperationsStore {
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** Mismo resultado fiscal, campo a campo (PostgreSQL guarda el JSON con otro orden de claves). */
+function sameFiscal(a: RecordedFiscalResult | null, b: RecordedFiscalResult | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.contractVersion === b.contractVersion && a.provenance === b.provenance && a.documentId === b.documentId && a.documentNumber === b.documentNumber &&
+    a.issuerId === b.issuerId && a.organizationId === b.organizationId && a.country === b.country && a.fiscalStatus === b.fiscalStatus &&
+    a.submissionStatus === b.submissionStatus && a.integrity.digest === b.integrity.digest && a.definitive === b.definitive;
+}
+
 const sameData = (a: OperationRecord, b: OperationInput): boolean =>
   a.organizationId === b.organizationId && a.kind === b.kind && a.occurredOn === b.occurredOn && a.amount === b.amount && a.currency === b.currency &&
   a.counterparty === b.counterparty && a.document?.type === b.document?.type && a.document?.number === b.document?.number &&
-  a.origin === b.origin && a.nature === (b.nature ?? null) && JSON.stringify(a.links) === JSON.stringify(b.links ?? []);
+  a.origin === b.origin && a.nature === (b.nature ?? null) && JSON.stringify(a.links) === JSON.stringify(b.links ?? []) &&
+  sameFiscal(a.fiscal, checkFiscal(b));
 
 /** Quién y por qué en una corrección o anulación (spec 003 Q3). */
 export interface CorrectionMeta {
@@ -118,6 +194,7 @@ export function createOperationsRegister(deps: { readonly store: OperationsStore
       throw new LedgerError("INVALID_INPUT", "Operación incompleta: organización, fecha AAAA-MM-DD, moneda, origen y autor son obligatorios");
     }
     if (input.nature != null && !(OPERATION_NATURES as readonly string[]).includes(input.nature)) throw new LedgerError("INVALID_INPUT", "Naturaleza del importe desconocida", { nature: input.nature });
+    checkFiscal(input);
   };
   const validateMeta = (meta: CorrectionMeta) => {
     if (!meta.reason.trim() || !meta.recordedBy) throw new LedgerError("INVALID_INPUT", "Una corrección o anulación exige motivo y autor");
@@ -149,7 +226,10 @@ export function createOperationsRegister(deps: { readonly store: OperationsStore
     };
     return insertVersion(reversal, (stored) => stored.reverses === target.id);
   };
-  const build = (input: OperationInput, version: number): OperationRecord => ({ ...input, id: randomUUID(), links: [...(input.links ?? [])], nature: input.nature ?? null, sourceVersion: version, reverses: null, reason: null });
+  const build = (input: OperationInput, version: number): OperationRecord => {
+    const { fiscal: _envelope, ...data } = input;
+    return { ...data, id: randomUUID(), links: [...(input.links ?? [])], nature: input.nature ?? null, sourceVersion: version, reverses: null, reason: null, fiscal: checkFiscal(input) };
+  };
   const append = async (input: OperationInput, version: number): Promise<OperationRecord> => {
     const record = build(input, version);
     return insertVersion(record, (stored) => stored.reverses === null && sameData(stored, input));
@@ -212,7 +292,7 @@ export function createOperationsRegister(deps: { readonly store: OperationsStore
 }
 
 // Las columnas nuevas van siempre al final: las importaciones que ya leen las anteriores no se rompen (REF-DEC-013 Q4).
-const HEADER = ["fecha", "tipo", "documento_tipo", "documento_numero", "contraparte", "importe", "moneda", "origen", "enlaces", "referencia_origen", "naturaleza", "version_origen", "revierte", "motivo"];
+const HEADER = ["fecha", "tipo", "documento_tipo", "documento_numero", "contraparte", "importe", "moneda", "origen", "enlaces", "referencia_origen", "naturaleza", "version_origen", "revierte", "motivo", "documento_fiscal", "fiscal_definitivo"];
 
 /** Texto seguro para CSV: sin fórmulas (=, +, -, @) y entrecomillado si lleva separador o comillas. */
 function cell(value: string): string {
@@ -223,7 +303,7 @@ function cell(value: string): string {
 /** R-CORE-013: exportación por organización y periodo (CSV con `;`, CRLF e importes exactos). */
 export function exportOperationsCsv(records: readonly OperationRecord[]): string {
   const lines = records.map((r) =>
-    [r.occurredOn, r.kind, r.document?.type ?? "", r.document?.number ?? "", r.counterparty, formatMinor(r.amount), r.currency, r.origin, r.links.join(" "), `${r.source.system}:${r.source.id}`, r.nature ?? "", String(r.sourceVersion), r.reverses ?? "", r.reason ?? ""]
+    [r.occurredOn, r.kind, r.document?.type ?? "", r.document?.number ?? "", r.counterparty, formatMinor(r.amount), r.currency, r.origin, r.links.join(" "), `${r.source.system}:${r.source.id}`, r.nature ?? "", String(r.sourceVersion), r.reverses ?? "", r.reason ?? "", r.fiscal?.documentId ?? "", r.fiscal ? (r.fiscal.definitive ? "si" : "no") : ""]
       .map((v, i) => (i === 5 ? v : cell(v)))
       .join(";"),
   );

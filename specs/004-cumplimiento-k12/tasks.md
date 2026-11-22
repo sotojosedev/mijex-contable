@@ -31,11 +31,28 @@ Plan aprobado el 2026-11-22 (`plan.md`, REF-DEC-015). La spec de Q4 en `mijex-fi
   aplicaría la 0006; ninguno está en marcha (el de `main` no usa la librería).
   Regresión del 004b (2026-11-22): librería 98 unit + 49→55 PG, build; Property 551 unit, e2e 164/164, frontend
   349 pruebas.
-- [ ] **T013** Aplicar 0006 en las bases de desarrollo de la rama, con copia previa. **Necesita la aprobación del dueño.**
+- [x] **T013** 0006 aplicada el 2026-11-22 con aprobación del dueño en `mijex_property` y `mijex_contingencia_dev`
+  (`migrate()` de la librería, solo lo pendiente), tras copias `~/mijex-backups/*-pre-0006-20261122-193801.dump`
+  (validadas: 162 y 119 tablas con datos). Catálogo vacío en las dos; columnas y trigger comprobados.
 
 ## 004c · Q3: contrato del resultado fiscal (migración 0007)
-- [ ] **T020** `FiscalResultEnvelope` y pruebas de rechazo en rojo (memoria y PG); migración 0007 validada.
-- [ ] **T021** Property envía el sobre en las cuotas emitidas con la librería.
+- [x] **T020** `FiscalResultEnvelope` (`contractVersion` 1) en `OperationInput.fiscal`, con pruebas de rechazo en rojo
+  primero (6 fallos) en memoria y PG: `FISCAL_PROVENANCE` (externo sin origen manual; fiscal-core sin documento),
+  `FISCAL_VERSION`, `FISCAL_STATUS` (estados que no son de fiscal-core), `FISCAL_SCOPE` (otra organización, país mal
+  formado, otro número de documento) y `FISCAL_INTEGRITY` (algoritmo, huella mal formada o que no coincide con el
+  contenido). Definitivo = envío ACCEPTED, ACCEPTED_WITH_ERRORS o NOT_SUBMITTED y documento ACTIVE, PARTIALLY_CORRECTED
+  o CORRECTED (clasificación cerrada de los estados de fiscal-core, no de la ley). Un cambio del sobre es una
+  corrección (reversión y versión nueva). CSV con `documento_fiscal` y `fiscal_definitivo` al final (compatible).
+  Migración 0007 validada en la base de pruebas (60 pruebas PG). `todo` I-K12-4 → prueba.
+- [x] **T021** Property envía el sobre en las cuotas emitidas con la librería (decisión del dueño del 2026-11-22: huella
+  SHA-256 de la serialización canónica del documento que guarda fiscal-core, con el contenido para comprobarla;
+  provisional hasta la huella oficial de la spec de Q4; cada cambio de estado se versiona). `fiscalEnvelope.ts` con
+  unitaria (3); e2e `operations-fiscal-004c` en rojo (5 fallos) y en verde: registrada no definitiva, sin versiones al
+  repetir, aceptada → reversión y versión definitiva, CSV con «si». Un documento que no se puede leer deja la cuota
+  pendiente, sin registro a medias. La aceptación por la autoridad se recoge en la siguiente sincronización.
+  Regresión del 004c (2026-11-22): librería 104 unit + 60 PG, build; Property 554 unit, lint, e2e 164/165 con
+  `operations-origins-003` fallando por la cabecera del CSV (columnas nuevas al final, esperado); comprobación
+  actualizada y en verde por separado.
 - [ ] **T022** Aplicar 0007 en desarrollo, con copia previa. **Necesita la aprobación del dueño.**
 
 ## Cierre

@@ -80,5 +80,14 @@ describe("[K12] tratamiento fiscal solo con regla validada (R-CORE-014)", () => 
     await expect(catalog.verify("R-K12-3", 2, { reviewedBy: "pa-1", reference: "Norma", reason: "Autoverificación" })).rejects.toMatchObject({ code: "SELF_VERIFICATION" });
     await expect(catalog.verify("R-K12-3", 2, { reviewedBy: "pa-2", reference: "Norma", reason: "Verificación" })).resolves.toMatchObject({ validation: "VERIFIED", proposedBy: "pa-1", reviewedBy: "pa-2" });
   });
-  it.todo("I-K12-4: el registro comprueba la procedencia y el estado del resultado fiscal antes de registrarlo");
+  it("I-K12-4 (spec 004c): el registro comprueba la procedencia y el estado del resultado fiscal antes de registrarlo", async () => {
+    const register = createOperationsRegister({ store: createMemoryOperationsStore() });
+    const base: OperationInput = {
+      organizationId: "org-k12", kind: "INVOICE", occurredOn: "2026-11-22", amount: 10_000n, currency: "EUR", counterparty: "Cliente",
+      document: { type: "FACTURA", number: "F-K12" }, source: { system: "test", id: "factura-k12" }, origin: "AUTOMATIC", recordedBy: "system",
+    };
+    const fiscal = { contractVersion: 1, provenance: "FISCAL_CORE", documentId: "doc-k12", documentNumber: "F-K12", issuerId: "issuer", organizationId: "org-k12", country: "ES", fiscalStatus: "ACTIVE", submissionStatus: "IN_PROCESS", integrity: { algorithm: "SHA-256", digest: "a".repeat(64) } } as const;
+    await expect(register.record({ ...base, fiscal: { ...fiscal, organizationId: "otra-org" } })).rejects.toMatchObject({ code: "FISCAL_SCOPE" });
+    expect((await register.record({ ...base, fiscal })).fiscal).toMatchObject({ definitive: false });
+  });
 });

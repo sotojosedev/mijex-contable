@@ -62,14 +62,14 @@ describe("[R-CORE-012] PostgreSQL: el registro de operaciones es de solo inserci
   beforeEach(() => resetDatabase(pool));
   it("no se edita ni se borra", async () => {
     const store = createPgOperationsStore({ pool });
-    const r = await store.insert({ id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e01", organizationId: "org-a", kind: "INVOICE", occurredOn: "2026-11-10", amount: 100n, currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "1" }, links: [], origin: "AUTOMATIC", recordedBy: "system", nature: null, sourceVersion: 1, reverses: null, reason: null });
+    const r = await store.insert({ id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e01", organizationId: "org-a", kind: "INVOICE", occurredOn: "2026-11-10", amount: 100n, currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "1" }, links: [], origin: "AUTOMATIC", recordedBy: "system", nature: null, sourceVersion: 1, reverses: null, reason: null, fiscal: null });
     await expect(pool.query("UPDATE contable.operation_record SET amount = 1 WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
     await expect(pool.query("DELETE FROM contable.operation_record WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
   });
 
   it("[R-CORE-012] 0004: una reversión exige motivo y cada registro se revierte una sola vez (spec 003 Q3)", async () => {
     const store = createPgOperationsStore({ pool });
-    const base = { organizationId: "org-a", kind: "INVOICE" as const, occurredOn: "2026-11-10", currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "2" }, links: [], origin: "AUTOMATIC" as const, recordedBy: "system", nature: null };
+    const base = { organizationId: "org-a", kind: "INVOICE" as const, occurredOn: "2026-11-10", currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "2" }, links: [], origin: "AUTOMATIC" as const, recordedBy: "system", nature: null, fiscal: null };
     const r = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e02", amount: 100n, sourceVersion: 1, reverses: null, reason: null });
     await expect(store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e03", amount: -100n, sourceVersion: 2, reverses: r.id, reason: " " })).rejects.toThrow(/operation_record_reversal_reason/);
     const first = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e04", amount: -100n, sourceVersion: 2, reverses: r.id, reason: "anulada" });
