@@ -20,8 +20,8 @@ registro de cambios de `docs/diseno-tecnico.md`. Las decisiones propias de una s
 
 ## Deuda y huecos del proceso conocidos (2026-11-22)
 - Spec 002 sin `clarify.md` ni `plan.md`.
-- Constitución v1.1.0 ratificada (REF-DEC-014). K12 tiene cuatro incumplimientos conocidos (I-K12-1 a I-K12-4 en
-  `constitucion.md`), pendientes de que el dueño decida cómo resolverlos.
+- Constitución v1.1.0 ratificada (REF-DEC-014). Spec 004 cerró I-K12-1, 3 y 4. Queda I-K12-2 (reglas fiscales fuera
+  de fiscal-core), para la spec de Q4 en `mijex-fiscal`, que también debe publicar la huella oficial del documento.
 - Las reglas del catálogo de la 003 siguen «pendientes de verificación»: verificarlas es trabajo del dueño.
 - `npm run lint` y `npm run knip` fallan por ficheros de `.agents/` (skills de terceros, no se tocan); `eslint src tests`
   queda limpio.

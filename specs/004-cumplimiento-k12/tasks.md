@@ -53,9 +53,13 @@ Plan aprobado el 2026-11-22 (`plan.md`, REF-DEC-015). La spec de Q4 en `mijex-fi
   Regresión del 004c (2026-11-22): librería 104 unit + 60 PG, build; Property 554 unit, lint, e2e 164/165 con
   `operations-origins-003` fallando por la cabecera del CSV (columnas nuevas al final, esperado); comprobación
   actualizada y en verde por separado.
-- [ ] **T022** Aplicar 0007 en desarrollo, con copia previa. **Necesita la aprobación del dueño.**
+- [x] **T022** 0007 aplicada el 2026-11-22 con aprobación del dueño en `mijex_property` y `mijex_contingencia_dev`,
+  tras copias `~/mijex-backups/*-pre-0007-20261122-201202.dump` (validadas: 162 y 119 tablas con datos); 0 registros
+  previos en las dos.
 
 ## Cierre
-- [ ] **T090** Regresión completa.
-- [ ] **T095** Documentación: R-CORE-014 y R-CORE-012, constitución (I-K12-1, 3 y 4 cerrados), `diseno-tecnico.md`,
-  índice del SDD; Property `DISENO-TECNICO`.
+- [x] **T090** Regresión completa (2026-11-22, tras el 004c): librería 104 unit + 60 PG, lint de `src` y `tests`,
+  typecheck y build; Property 554 unit, lint, e2e 165/165 (164 en la suite y `operations-origins-003` corregida y en
+  verde por separado), frontend 349 pruebas y build.
+- [x] **T095** Documentación: R-CORE-014 y R-CORE-012, constitución (I-K12-1, 3 y 4 cerrados; I-K12-2 queda para la
+  spec de Q4), `diseno-tecnico.md`, índice y memoria del SDD; Property `DISENO-TECNICO`.
