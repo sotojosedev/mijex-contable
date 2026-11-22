@@ -134,8 +134,10 @@ sin la aprobación final de ese paso.
   `numbered-invoice-edit-003`. Consecuencia: ya no se prorroga el vencimiento de una cuota numerada.
 
 ### F · Verificación y cierre
-- [ ] **T090** Regresión completa (`migraciones-y-regresion.md` §5.2): librería, Property (backend y frontend) y Home
-  Services.
+- [x] **T090** Regresión completa (`migraciones-y-regresion.md` §5.2): librería, Property (backend y frontend) y Home
+  Services. 2026-11-22: librería 87 unit + 49 PG; Property 529 unit, 158/158 ficheros e2e, frontend 94 ficheros
+  (347 pruebas) y build; HS 1329 pruebas, con 2 intermitentes (`leadsAutomation`, `partnerWebhookDocuments`) que pasan
+  por separado. El build del frontend fallaba por un error de tipos anterior (062e, `TenantInvoicesPage`), corregido.
 - [x] **T095** R-CORE-012 y R-CORE-014 ampliadas, REF-DEC-013, `docs/diseno-tecnico.md` e índice de `sdd/`.
 
 ## Analyze · trazabilidad
