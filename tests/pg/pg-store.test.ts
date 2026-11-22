@@ -6,6 +6,8 @@ import { installFramework, MIJEX_EVENTS, MIJEX_FRAMEWORKS } from "../../src/fram
 import { resetDatabase, testPool } from "./pg-env.js";
 import { createPgOperationsStore } from "../../src/persistence/pg/operations-store.js";
 import { operationsContract } from "../contract/operations.contract.js";
+import { createPgFiscalRuleStore } from "../../src/persistence/pg/fiscal-rule-store.js";
+import { fiscalRulesContract } from "../contract/fiscal-rules.contract.js";
 
 const pool = testPool();
 afterAll(() => pool.end());
@@ -20,13 +22,40 @@ operationsContract("PostgreSQL", async () => {
   return createPgOperationsStore({ pool });
 });
 
+fiscalRulesContract("PostgreSQL", async () => {
+  await resetDatabase(pool);
+  return createPgFiscalRuleStore({ pool });
+});
+
+describe("[R-CORE-014] PostgreSQL: el catálogo fiscal es de solo inserción (0005)", () => {
+  beforeEach(() => resetDatabase(pool));
+  it("no se edita ni se borra, y VERIFIED sin referencia se rechaza en la base", async () => {
+    const store = createPgFiscalRuleStore({ pool });
+    const base = { ruleId: "R-T", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "OTRO", treatment: "FISCAL_INVOICE", validFrom: "2000-01-01", recordedBy: "system", reason: "prueba" };
+    const r = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e20", version: 1, validation: "APPROVED_PENDING_VERIFICATION" });
+    await expect(pool.query("UPDATE contable.fiscal_rule SET treatment = 'X' WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
+    await expect(pool.query("DELETE FROM contable.fiscal_rule WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
+    await expect(store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e21", version: 2, validation: "VERIFIED" })).rejects.toThrow(/fiscal_rule_verified_reference/);
+  });
+});
+
 describe("[R-CORE-012] PostgreSQL: el registro de operaciones es de solo inserción", () => {
   beforeEach(() => resetDatabase(pool));
   it("no se edita ni se borra", async () => {
     const store = createPgOperationsStore({ pool });
-    const r = await store.insert({ id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e01", organizationId: "org-a", kind: "INVOICE", occurredOn: "2026-11-10", amount: 100n, currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "1" }, links: [], origin: "AUTOMATIC", recordedBy: "system" });
+    const r = await store.insert({ id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e01", organizationId: "org-a", kind: "INVOICE", occurredOn: "2026-11-10", amount: 100n, currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "1" }, links: [], origin: "AUTOMATIC", recordedBy: "system", nature: null, sourceVersion: 1, reverses: null, reason: null });
     await expect(pool.query("UPDATE contable.operation_record SET amount = 1 WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
     await expect(pool.query("DELETE FROM contable.operation_record WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
+  });
+
+  it("[R-CORE-012] 0004: una reversión exige motivo y cada registro se revierte una sola vez (spec 003 Q3)", async () => {
+    const store = createPgOperationsStore({ pool });
+    const base = { organizationId: "org-a", kind: "INVOICE" as const, occurredOn: "2026-11-10", currency: "EUR", counterparty: "x", document: null, source: { system: "t", id: "2" }, links: [], origin: "AUTOMATIC" as const, recordedBy: "system", nature: null };
+    const r = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e02", amount: 100n, sourceVersion: 1, reverses: null, reason: null });
+    await expect(store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e03", amount: -100n, sourceVersion: 2, reverses: r.id, reason: " " })).rejects.toThrow(/operation_record_reversal_reason/);
+    const first = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e04", amount: -100n, sourceVersion: 2, reverses: r.id, reason: "anulada" });
+    const again = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e05", amount: -100n, sourceVersion: 3, reverses: r.id, reason: "anulada" });
+    expect(again.id).toBe(first.id);
   });
 });
 

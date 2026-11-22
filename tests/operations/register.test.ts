@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createMemoryOperationsStore, decideFiscalIssuance, type FiscalRule, type IssuanceQuery } from "../../src/operations/index.js";
+import { createMemoryFiscalRuleStore, createMemoryOperationsStore, decideFiscalIssuance, type FiscalRule, type IssuanceQuery } from "../../src/operations/index.js";
+import { fiscalRulesContract } from "../contract/fiscal-rules.contract.js";
 import { operationsContract } from "../contract/operations.contract.js";
 
 
 
 operationsContract("memoria", () => Promise.resolve(createMemoryOperationsStore()));
+fiscalRulesContract("memoria", () => Promise.resolve(createMemoryFiscalRuleStore()));
 
 describe("[R-CORE-014] catálogo de reglas fiscales y decisión de emisión por operación (REF-DEC-009)", () => {
   const rule = (over: Partial<FiscalRule> = {}): FiscalRule => ({

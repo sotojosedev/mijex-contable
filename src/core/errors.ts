@@ -16,7 +16,9 @@ export type LedgerErrorCode =
   | "CANNOT_REVERSE_REVERSAL"
   // Spec 003: registro de operaciones y obligaciones fiscales.
   | "IDEMPOTENCY_CONFLICT"
-  | "INVALID_LINK";
+  | "INVALID_LINK"
+  // Spec 003, corte 2: dos correcciones del mismo origen a la vez (se reintenta).
+  | "CONCURRENT_UPDATE";
 
 /** Error tipado de la librería contable; `details` nunca lleva secretos ni datos personales. */
 export class LedgerError extends Error {

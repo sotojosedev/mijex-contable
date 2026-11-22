@@ -2,7 +2,8 @@
 
 | Campo | Valor |
 |-------|-------|
-| Estado | Specify (2026-11-18). Implementación del núcleo en curso. |
+| Estado | Núcleo y Property T4a/T4b implementados. Clarify abierto y plan en borrador (2026-11-22): [clarify.md](clarify.md), [plan.md](plan.md). |
+| Nota | `resolveObligation` y `assertAutomaticIssuance` (§Diseño) se sustituyeron en T3b por `decideFiscalIssuance` con el catálogo de R-CORE-014. |
 | Origen | Decisión del usuario del 2026-11-18 (REF-DEC-008): «MIJEX debe generar sus registros automáticamente a partir de las operaciones que administra, permitiendo también incorporar documentos y operaciones externas, sin convertir necesariamente Property en un programa completo de contabilidad». También: «MIJEX no tiene por qué llevar la contabilidad oficial de cada comunidad o empresa administradora». |
 | Reglas | R-CORE-012 (registro de operaciones), R-CORE-013 (separación por organización), R-CORE-014 (obligaciones fiscales por tipo de organización; si no están determinadas, no hay emisión automática) |
 | Referencias | REF-DEC-008. Cada obligación fiscal configurada lleva su propia referencia oficial (ICAC, BOE o AEAT en ES; DGII o ICPARD en DO). Sin referencia queda `UNDETERMINED`. |

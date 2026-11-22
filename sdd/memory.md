@@ -19,7 +19,7 @@ registro de cambios de `docs/diseno-tecnico.md`. Las decisiones propias de una s
 `clarify.md`.
 
 ## Deuda y huecos del proceso conocidos (2026-11-21)
-- Specs 002 y 003 sin `clarify.md` ni `plan.md`: se hicieron antes de existir esta carpeta.
+- Spec 002 sin `clarify.md` ni `plan.md`; la 003 los tiene desde el 2026-11-22 (clarify abierto, plan en borrador).
 - Spec 003, T5 (catálogo de reglas de Property): se solapa con el catálogo de la spec 055 de Property y con las
   validaciones por país de su spec 062. Hay que reconciliarlo antes de implementarlo, para no duplicar catálogos.
 - La constitución está pendiente de ratificación del dueño.

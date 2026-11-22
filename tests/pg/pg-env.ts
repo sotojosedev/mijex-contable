@@ -12,7 +12,7 @@ export async function resetDatabase(pool: pg.Pool): Promise<void> {
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL session_replication_role = replica");
-    for (const t of ["operation_record", "journal_line", "journal_entry", "posting_rule", "account", "chart", "entity"]) await client.query(`DELETE FROM contable.${t}`);
+    for (const t of ["fiscal_rule", "operation_record", "journal_line", "journal_entry", "posting_rule", "account", "chart", "entity"]) await client.query(`DELETE FROM contable.${t}`);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

@@ -8,7 +8,14 @@ import type { CivilDate, Minor } from "../core/types.js";
 // (REF-DEC-008): es la traza de facturas, recibos, cobros, pagos y documentos externos, exportable
 // para su contable. Solo inserción; una corrección es un registro nuevo que enlaza el anterior.
 
-export type OperationKind = "INVOICE" | "RECEIPT" | "COLLECTION" | "PAYMENT" | "SUPPLIER_INVOICE" | "EXTERNAL";
+export type OperationKind = "INVOICE" | "RECEIPT" | "COLLECTION" | "PAYMENT" | "SUPPLIER_INVOICE" | "EXTERNAL" | "WITHHOLDING" | "FEE_ACCRUAL";
+
+/**
+ * Naturaleza del importe para la organización (spec 003 Q4, REF-DEC-013): ingreso propio, fondos de terceros
+ * (p. ej. la renta del propietario que la administradora cobra), retención, pago de impuestos o liquidación.
+ */
+export const OPERATION_NATURES = ["OWN_INCOME", "THIRD_PARTY_FUNDS", "WITHHOLDING", "TAX_PAYMENT", "SETTLEMENT"] as const;
+export type OperationNature = (typeof OPERATION_NATURES)[number];
 
 export interface OperationInput {
   readonly organizationId: string;
@@ -24,28 +31,39 @@ export interface OperationInput {
   /** AUTOMATIC = generado por una operación administrada; MANUAL = documento u operación externa aportada. */
   readonly origin: "AUTOMATIC" | "MANUAL";
   readonly recordedBy: string;
+  /** Opcional (compatible): sin ella el registro queda sin clasificar. */
+  readonly nature?: OperationNature | null | undefined;
 }
 
-export interface OperationRecord extends Omit<OperationInput, "links"> {
+export interface OperationRecord extends Omit<OperationInput, "links" | "nature"> {
   readonly id: string;
   readonly links: readonly string[];
+  readonly nature: OperationNature | null;
+  /** Versión dentro del mismo origen (1 = primera). Una reversión y cada versión nueva ocupan la siguiente. */
+  readonly sourceVersion: number;
+  /** Registro que anula (corrección o anulación, spec 003 Q3); null en los registros normales. */
+  readonly reverses: string | null;
+  /** Motivo de la reversión; null en los registros normales. */
+  readonly reason: string | null;
 }
 
 export interface OperationsStore {
-  bySource(system: string, id: string): Promise<OperationRecord | undefined>;
+  /** Todas las versiones de un origen, de la primera a la última. */
+  versionsBySource(system: string, id: string): Promise<OperationRecord[]>;
   byId(id: string): Promise<OperationRecord | undefined>;
-  /** Guarda el registro; si el origen ya existe (carrera), devuelve el que quedó guardado. */
+  /** Guarda el registro; si esa versión del origen ya existe (carrera), devuelve la que quedó guardada. */
   insert(record: OperationRecord): Promise<OperationRecord>;
   list(organizationId: string, range: { readonly from?: CivilDate | undefined; readonly to?: CivilDate | undefined }): Promise<OperationRecord[]>;
 }
 
 export function createMemoryOperationsStore(): OperationsStore {
   const rows: OperationRecord[] = [];
+  const sameVersion = (a: OperationRecord, b: OperationRecord) => a.source.system === b.source.system && a.source.id === b.source.id && a.sourceVersion === b.sourceVersion;
   return {
-    bySource: (system, id) => Promise.resolve(rows.find((r) => r.source.system === system && r.source.id === id)),
+    versionsBySource: (system, id) => Promise.resolve(rows.filter((r) => r.source.system === system && r.source.id === id).sort((a, b) => a.sourceVersion - b.sourceVersion)),
     byId: (id) => Promise.resolve(rows.find((r) => r.id === id)),
     insert: (record) => {
-      const existing = rows.find((r) => r.source.system === record.source.system && r.source.id === record.source.id);
+      const existing = rows.find((r) => sameVersion(r, record) || (record.reverses !== null && r.reverses === record.reverses));
       if (existing) return Promise.resolve(existing);
       rows.push(record);
       return Promise.resolve(record);
@@ -63,35 +81,114 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const sameData = (a: OperationRecord, b: OperationInput): boolean =>
   a.organizationId === b.organizationId && a.kind === b.kind && a.occurredOn === b.occurredOn && a.amount === b.amount && a.currency === b.currency &&
   a.counterparty === b.counterparty && a.document?.type === b.document?.type && a.document?.number === b.document?.number &&
-  a.origin === b.origin && JSON.stringify(a.links) === JSON.stringify(b.links ?? []);
+  a.origin === b.origin && a.nature === (b.nature ?? null) && JSON.stringify(a.links) === JSON.stringify(b.links ?? []);
+
+/** Quién y por qué en una corrección o anulación (spec 003 Q3). */
+export interface CorrectionMeta {
+  readonly reason: string;
+  readonly recordedBy: string;
+}
 
 export interface OperationsRegister {
   record(input: OperationInput): Promise<OperationRecord>;
+  /**
+   * Si el origen no cambió, devuelve su versión vigente; si cambió, añade la reversión de la vigente y la versión
+   * nueva, enlazadas. Nada se edita (R-CORE-003, R-CORE-012).
+   */
+  recordCorrection(input: OperationInput, meta: CorrectionMeta): Promise<{ readonly reversal: OperationRecord | null; readonly record: OperationRecord }>;
+  /** Versión vigente del origen (solo lectura); null si no hay ninguna o está anulado. */
+  current(source: { readonly system: string; readonly id: string }): Promise<OperationRecord | null>;
+  /** Anula la versión vigente del origen con una reversión; null si no había nada vigente. */
+  recordReversal(source: { readonly system: string; readonly id: string }, meta: CorrectionMeta): Promise<OperationRecord | null>;
   list(organizationId: string, range?: { readonly from?: CivilDate; readonly to?: CivilDate }): Promise<OperationRecord[]>;
   trace(id: string): Promise<OperationRecord[]>;
+}
+
+/** Versión vigente de un origen: la última que no es una reversión ni ha sido revertida. */
+function current(versions: readonly OperationRecord[]): OperationRecord | undefined {
+  const reversed = new Set(versions.map((v) => v.reverses).filter((v): v is string => v !== null));
+  return [...versions].reverse().find((v) => v.reverses === null && !reversed.has(v.id));
 }
 
 /** R-CORE-012/013: registro idempotente por origen, enlaces solo dentro de la misma organización. */
 export function createOperationsRegister(deps: { readonly store: OperationsStore }): OperationsRegister {
   const { store } = deps;
+  const validate = (input: OperationInput) => {
+    if (!input.organizationId || !DATE.test(input.occurredOn) || !input.currency || !input.source.system || !input.source.id || !input.recordedBy) {
+      throw new LedgerError("INVALID_INPUT", "Operación incompleta: organización, fecha AAAA-MM-DD, moneda, origen y autor son obligatorios");
+    }
+    if (input.nature != null && !(OPERATION_NATURES as readonly string[]).includes(input.nature)) throw new LedgerError("INVALID_INPUT", "Naturaleza del importe desconocida", { nature: input.nature });
+  };
+  const validateMeta = (meta: CorrectionMeta) => {
+    if (!meta.reason.trim() || !meta.recordedBy) throw new LedgerError("INVALID_INPUT", "Una corrección o anulación exige motivo y autor");
+  };
+  const checkLinks = async (input: OperationInput) => {
+    for (const link of input.links ?? []) {
+      const target = await store.byId(link);
+      if (target?.organizationId !== input.organizationId) throw new LedgerError("INVALID_LINK", "Solo se enlazan registros existentes de la misma organización", { link });
+    }
+  };
+  const nextVersion = (versions: readonly OperationRecord[]) => (versions.at(-1)?.sourceVersion ?? 0) + 1;
+  /** Inserta una versión; si otro proceso ocupó esa versión con otros datos, es una corrección concurrente. */
+  const insertVersion = async (record: OperationRecord, same: (stored: OperationRecord) => boolean): Promise<OperationRecord> => {
+    const stored = await store.insert(record);
+    if (stored.id !== record.id && !same(stored)) throw new LedgerError("CONCURRENT_UPDATE", "Otra corrección del mismo origen se registró a la vez; vuelve a intentarlo", { recordId: stored.id });
+    return stored;
+  };
+  const reversalOf = async (target: OperationRecord, version: number, meta: CorrectionMeta): Promise<OperationRecord> => {
+    const reversal: OperationRecord = {
+      ...target,
+      id: randomUUID(),
+      // Misma fecha que la operación que anula: el saldo del periodo cuadra (la fecha real queda en el almacén).
+      amount: -target.amount,
+      links: [target.id],
+      sourceVersion: version,
+      reverses: target.id,
+      reason: meta.reason.trim(),
+      recordedBy: meta.recordedBy,
+    };
+    return insertVersion(reversal, (stored) => stored.reverses === target.id);
+  };
+  const build = (input: OperationInput, version: number): OperationRecord => ({ ...input, id: randomUUID(), links: [...(input.links ?? [])], nature: input.nature ?? null, sourceVersion: version, reverses: null, reason: null });
+  const append = async (input: OperationInput, version: number): Promise<OperationRecord> => {
+    const record = build(input, version);
+    return insertVersion(record, (stored) => stored.reverses === null && sameData(stored, input));
+  };
   return {
     async record(input: OperationInput): Promise<OperationRecord> {
-      if (!input.organizationId || !DATE.test(input.occurredOn) || !input.currency || !input.source.system || !input.source.id || !input.recordedBy) {
-        throw new LedgerError("INVALID_INPUT", "Operación incompleta: organización, fecha AAAA-MM-DD, moneda, origen y autor son obligatorios");
-      }
-      const existing = await store.bySource(input.source.system, input.source.id);
+      validate(input);
+      const versions = await store.versionsBySource(input.source.system, input.source.id);
+      const existing = current(versions);
       if (existing) {
         if (!sameData(existing, input)) throw new LedgerError("IDEMPOTENCY_CONFLICT", "El mismo origen ya se registró con otros datos", { recordId: existing.id });
         return existing;
       }
-      for (const link of input.links ?? []) {
-        const target = await store.byId(link);
-        if (target?.organizationId !== input.organizationId) throw new LedgerError("INVALID_LINK", "Solo se enlazan registros existentes de la misma organización", { link });
-      }
-      const record: OperationRecord = { ...input, id: randomUUID(), links: [...(input.links ?? [])] };
+      await checkLinks(input);
+      const record = build(input, nextVersion(versions));
       const stored = await store.insert(record);
       if (stored.id !== record.id && !sameData(stored, input)) throw new LedgerError("IDEMPOTENCY_CONFLICT", "El mismo origen ya se registró con otros datos", { recordId: stored.id });
       return stored;
+    },
+    async recordCorrection(input, meta) {
+      validate(input);
+      validateMeta(meta);
+      const versions = await store.versionsBySource(input.source.system, input.source.id);
+      const existing = current(versions);
+      if (existing && sameData(existing, input)) return { reversal: null, record: existing };
+      await checkLinks(input);
+      if (!existing) return { reversal: null, record: await append(input, nextVersion(versions)) };
+      const reversal = await reversalOf(existing, nextVersion(versions), meta);
+      return { reversal, record: await append(input, reversal.sourceVersion + 1) };
+    },
+    async current(source) {
+      return current(await store.versionsBySource(source.system, source.id)) ?? null;
+    },
+    async recordReversal(source, meta) {
+      validateMeta(meta);
+      const versions = await store.versionsBySource(source.system, source.id);
+      const existing = current(versions);
+      if (!existing) return null;
+      return reversalOf(existing, nextVersion(versions), meta);
     },
     list: (organizationId: string, range: { readonly from?: CivilDate; readonly to?: CivilDate } = {}) => store.list(organizationId, range),
     /** El registro y todos los que enlaza, en profundidad (factura ← recibo ← cobro). */
@@ -114,7 +211,8 @@ export function createOperationsRegister(deps: { readonly store: OperationsStore
   };
 }
 
-const HEADER = ["fecha", "tipo", "documento_tipo", "documento_numero", "contraparte", "importe", "moneda", "origen", "enlaces", "referencia_origen"];
+// Las columnas nuevas van siempre al final: las importaciones que ya leen las anteriores no se rompen (REF-DEC-013 Q4).
+const HEADER = ["fecha", "tipo", "documento_tipo", "documento_numero", "contraparte", "importe", "moneda", "origen", "enlaces", "referencia_origen", "naturaleza", "version_origen", "revierte", "motivo"];
 
 /** Texto seguro para CSV: sin fórmulas (=, +, -, @) y entrecomillado si lleva separador o comillas. */
 function cell(value: string): string {
@@ -125,7 +223,7 @@ function cell(value: string): string {
 /** R-CORE-013: exportación por organización y periodo (CSV con `;`, CRLF e importes exactos). */
 export function exportOperationsCsv(records: readonly OperationRecord[]): string {
   const lines = records.map((r) =>
-    [r.occurredOn, r.kind, r.document?.type ?? "", r.document?.number ?? "", r.counterparty, formatMinor(r.amount), r.currency, r.origin, r.links.join(" "), `${r.source.system}:${r.source.id}`]
+    [r.occurredOn, r.kind, r.document?.type ?? "", r.document?.number ?? "", r.counterparty, formatMinor(r.amount), r.currency, r.origin, r.links.join(" "), `${r.source.system}:${r.source.id}`, r.nature ?? "", String(r.sourceVersion), r.reverses ?? "", r.reason ?? ""]
       .map((v, i) => (i === 5 ? v : cell(v)))
       .join(";"),
   );
@@ -197,3 +295,5 @@ export function decideFiscalIssuance(catalog: readonly FiscalRule[], q: Issuance
   if (q.missingData.length > 0) return { action: "MANUAL_REVIEW", reason: "MISSING_DATA", missingData: [...q.missingData], ...ref };
   return { action: rule.treatment === "NO_FISCAL_DOCUMENT" ? "NO_FISCAL_DOCUMENT" : "ISSUE", reason: "RULE_APPLIES", ...ref };
 }
+
+export { createFiscalRuleCatalog, createMemoryFiscalRuleStore, type FiscalRuleCatalog, type FiscalRuleStore, type RuleVersionMeta, type StoredFiscalRule } from "./fiscal-rules.js";
