@@ -14,6 +14,16 @@ export interface StoredFiscalRule extends FiscalRule {
   readonly id: string;
   readonly recordedBy: string;
   readonly reason: string;
+  /** Spec 004b: quién propuso el contenido de esta versión. */
+  readonly proposedBy?: string | undefined;
+  /** Spec 004b: quién la revisó (VERIFIED o REJECTED) y cuándo (ISO 8601); siempre distinto de `proposedBy`. */
+  readonly reviewedBy?: string | undefined;
+  readonly reviewedAt?: string | undefined;
+}
+
+export interface ReviewMeta {
+  readonly reviewedBy: string;
+  readonly reason: string;
 }
 
 export interface FiscalRuleStore {
@@ -47,10 +57,17 @@ export interface RuleVersionMeta {
 }
 
 export interface FiscalRuleCatalog {
-  /** Carga inicial: traslada reglas ya aprobadas tal cual, como versión 1. Idempotente; devuelve cuántas añadió. */
+  /** Carga inicial: traslada reglas ya aprobadas tal cual, como propuestas (versión 1). Nunca verifica. Idempotente. */
   seed(rules: readonly Omit<FiscalRule, "version">[], meta: RuleVersionMeta): Promise<number>;
-  /** Añade la siguiente versión de una regla (o la primera, si es nueva y está verificada o no determinada). */
-  addVersion(rule: Omit<FiscalRule, "version">, meta: RuleVersionMeta): Promise<StoredFiscalRule>;
+  /**
+   * Propone la siguiente versión (pendiente de verificación) o marca la regla como no determinada, que es conservador.
+   * Una propuesta nunca genera documentos reales (K12); para que decida, otra persona la verifica.
+   */
+  propose(rule: Omit<FiscalRule, "version">, meta: RuleVersionMeta): Promise<StoredFiscalRule>;
+  /** Verifica la última propuesta pendiente, con su referencia oficial; nunca quien la propuso (spec 004b). */
+  verify(ruleId: string, version: number, meta: ReviewMeta & { readonly reference: string }): Promise<StoredFiscalRule>;
+  /** Rechaza la última propuesta pendiente; nunca quien la propuso. */
+  reject(ruleId: string, version: number, meta: ReviewMeta): Promise<StoredFiscalRule>;
   /** Todas las versiones (para `decideFiscalIssuance`). */
   rules(filter?: { readonly country?: string }): Promise<StoredFiscalRule[]>;
   history(ruleId: string): Promise<StoredFiscalRule[]>;
@@ -70,35 +87,62 @@ function validate(rule: Omit<FiscalRule, "version">, meta: RuleVersionMeta): voi
 
 export function createFiscalRuleCatalog(deps: { readonly store: FiscalRuleStore }): FiscalRuleCatalog {
   const { store } = deps;
-  const insertVersion = async (rule: Omit<FiscalRule, "version">, version: number, meta: RuleVersionMeta): Promise<StoredFiscalRule> => {
-    const row: StoredFiscalRule = { ...rule, ...(rule.reference ? { reference: rule.reference.trim() } : {}), version, id: randomUUID(), recordedBy: meta.recordedBy, reason: meta.reason.trim() };
+  const insert = async (row: StoredFiscalRule): Promise<StoredFiscalRule> => {
     const stored = await store.insert(row);
-    if (stored.id !== row.id) throw new LedgerError("CONCURRENT_UPDATE", "Otra versión de la misma regla se registró a la vez; vuelve a intentarlo", { ruleId: rule.ruleId });
+    if (stored.id !== row.id) throw new LedgerError("CONCURRENT_UPDATE", "Otra versión de la misma regla se registró a la vez; vuelve a intentarlo", { ruleId: row.ruleId });
     return stored;
+  };
+  const proposalOnly = (rule: Omit<FiscalRule, "version">) => {
+    if (rule.validation !== "APPROVED_PENDING_VERIFICATION" && rule.validation !== "UNDETERMINED") {
+      throw new LedgerError("RULE_INVALID", "Una regla solo se propone (pendiente) o se marca no determinada; la verifica otra persona", { ruleId: rule.ruleId });
+    }
+  };
+  const review = async (ruleId: string, version: number, meta: ReviewMeta, validation: "VERIFIED" | "REJECTED", reference?: string): Promise<StoredFiscalRule> => {
+    const verifiedReference = reference?.trim() ?? "";
+    if (!meta.reviewedBy.trim() || !meta.reason.trim()) throw new LedgerError("INVALID_INPUT", "La revisión exige revisor y motivo");
+    if (validation === "VERIFIED" && !verifiedReference) throw new LedgerError("RULE_INVALID", "Una regla VERIFIED exige su referencia oficial", { ruleId });
+    const last = (await store.list({ ruleId })).at(-1);
+    if (!last || last.version !== version || last.validation !== "APPROVED_PENDING_VERIFICATION") {
+      throw new LedgerError("STALE_PROPOSAL", "Solo se revisa la última versión de la regla y solo si es una propuesta pendiente", { ruleId, version });
+    }
+    const proposedBy = last.proposedBy ?? last.recordedBy;
+    if (proposedBy === meta.reviewedBy) throw new LedgerError("SELF_VERIFICATION", "Quien propone una regla no puede revisarla", { ruleId, version });
+    const { id: _id, recordedBy: _by, reason: _reason, reviewedBy: _rb, reviewedAt: _ra, version: _v, ...content } = last;
+    const ref = validation === "VERIFIED" ? verifiedReference : last.reference;
+    return insert({
+      ...content,
+      ...(ref ? { reference: ref } : {}),
+      validation,
+      version: last.version + 1,
+      id: randomUUID(),
+      recordedBy: meta.reviewedBy,
+      reason: meta.reason.trim(),
+      proposedBy,
+      reviewedBy: meta.reviewedBy,
+      reviewedAt: new Date().toISOString(),
+    });
   };
   return {
     async seed(rules, meta) {
       let added = 0;
       for (const rule of rules) {
         validate(rule, meta);
+        proposalOnly(rule);
         if ((await store.list({ ruleId: rule.ruleId })).length > 0) continue;
         const id = randomUUID();
-        const stored = await store.insert({ ...rule, version: 1, id, recordedBy: meta.recordedBy, reason: meta.reason.trim() });
+        const stored = await store.insert({ ...rule, version: 1, id, recordedBy: meta.recordedBy, reason: meta.reason.trim(), proposedBy: meta.recordedBy });
         if (stored.id === id) added += 1;
       }
       return added;
     },
-    async addVersion(rule, meta) {
+    async propose(rule, meta) {
       validate(rule, meta);
-      const versions = await store.list({ ruleId: rule.ruleId });
-      const last = versions.at(-1);
-      if (rule.validation === "APPROVED_PENDING_VERIFICATION") {
-        // Sin verificar no se activa nada nuevo: ni una regla nueva ni un tratamiento distinto.
-        if (!last) throw new LedgerError("RULE_INVALID", "Una regla nueva entra verificada (con referencia) o como no determinada", { ruleId: rule.ruleId });
-        if (rule.treatment !== last.treatment) throw new LedgerError("RULE_INVALID", "Cambiar el tratamiento exige verificar la regla con su referencia", { ruleId: rule.ruleId });
-      }
-      return insertVersion(rule, (last?.version ?? 0) + 1, meta);
+      proposalOnly(rule);
+      const last = (await store.list({ ruleId: rule.ruleId })).at(-1);
+      return insert({ ...rule, ...(rule.reference?.trim() ? { reference: rule.reference.trim() } : {}), version: (last?.version ?? 0) + 1, id: randomUUID(), recordedBy: meta.recordedBy, reason: meta.reason.trim(), proposedBy: meta.recordedBy });
     },
+    verify: (ruleId, version, meta) => review(ruleId, version, meta, "VERIFIED", meta.reference),
+    reject: (ruleId, version, meta) => review(ruleId, version, meta, "REJECTED"),
     rules: (filter = {}) => store.list({ country: filter.country }),
     history: (ruleId) => store.list({ ruleId }),
   };

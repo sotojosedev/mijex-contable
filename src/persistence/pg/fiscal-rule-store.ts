@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import type { RuleValidation } from "../../operations/index.js";
 import type { FiscalRuleStore, StoredFiscalRule } from "../../operations/fiscal-rules.js";
 
-// Spec 003, corte 2 (R-CORE-014): almacén PostgreSQL del catálogo fiscal (migración 0005). SQL parametrizado y solo
+// Spec 003, corte 2 (R-CORE-014): almacén PostgreSQL del catálogo fiscal (migraciones 0005 y 0006, spec 004b). SQL parametrizado y solo
 // inserción; la carrera de dos versiones iguales devuelve la que quedó guardada.
 
 interface Row {
@@ -20,10 +20,13 @@ interface Row {
   valid_to: string | null;
   recorded_by: string;
   reason: string;
+  proposed_by: string | null;
+  reviewed_by: string | null;
+  reviewed_at: Date | null;
 }
 
 const COLUMNS =
-  "id, rule_id, version, country, jurisdiction, organization_type, operation_type, treatment, validation, reference, to_char(valid_from, 'YYYY-MM-DD') AS valid_from, to_char(valid_to, 'YYYY-MM-DD') AS valid_to, recorded_by, reason";
+  "id, rule_id, version, country, jurisdiction, organization_type, operation_type, treatment, validation, reference, to_char(valid_from, 'YYYY-MM-DD') AS valid_from, to_char(valid_to, 'YYYY-MM-DD') AS valid_to, recorded_by, reason, proposed_by, reviewed_by, reviewed_at";
 
 const toRule = (r: Row): StoredFiscalRule => ({
   id: r.id,
@@ -40,6 +43,9 @@ const toRule = (r: Row): StoredFiscalRule => ({
   ...(r.valid_to === null ? {} : { validTo: r.valid_to }),
   recordedBy: r.recorded_by,
   reason: r.reason,
+  ...(r.proposed_by === null ? {} : { proposedBy: r.proposed_by }),
+  ...(r.reviewed_by === null ? {} : { reviewedBy: r.reviewed_by }),
+  ...(r.reviewed_at === null ? {} : { reviewedAt: r.reviewed_at.toISOString() }),
 });
 
 export function createPgFiscalRuleStore(deps: { readonly pool: Pool }): FiscalRuleStore {
@@ -47,11 +53,11 @@ export function createPgFiscalRuleStore(deps: { readonly pool: Pool }): FiscalRu
   return {
     async insert(r) {
       const { rows } = await pool.query<Row>(
-        `INSERT INTO contable.fiscal_rule (id, rule_id, version, country, jurisdiction, organization_type, operation_type, treatment, validation, reference, valid_from, valid_to, recorded_by, reason)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        `INSERT INTO contable.fiscal_rule (id, rule_id, version, country, jurisdiction, organization_type, operation_type, treatment, validation, reference, valid_from, valid_to, recorded_by, reason, proposed_by, reviewed_by, reviewed_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
          ON CONFLICT (rule_id, version) DO NOTHING
          RETURNING ${COLUMNS}`,
-        [r.id, r.ruleId, r.version, r.country, r.jurisdiction, r.organizationType, r.operationType, r.treatment, r.validation, r.reference ?? null, r.validFrom, r.validTo ?? null, r.recordedBy, r.reason],
+        [r.id, r.ruleId, r.version, r.country, r.jurisdiction, r.organizationType, r.operationType, r.treatment, r.validation, r.reference ?? null, r.validFrom, r.validTo ?? null, r.recordedBy, r.reason, r.proposedBy ?? null, r.reviewedBy ?? null, r.reviewedAt ?? null],
       );
       if (rows[0]) return toRule(rows[0]);
       const existing = await pool.query<Row>(`SELECT ${COLUMNS} FROM contable.fiscal_rule WHERE rule_id = $1 AND version = $2`, [r.ruleId, r.version]);

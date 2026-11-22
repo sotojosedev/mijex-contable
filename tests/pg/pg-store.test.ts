@@ -31,11 +31,30 @@ describe("[R-CORE-014] PostgreSQL: el catálogo fiscal es de solo inserción (00
   beforeEach(() => resetDatabase(pool));
   it("no se edita ni se borra, y VERIFIED sin referencia se rechaza en la base", async () => {
     const store = createPgFiscalRuleStore({ pool });
-    const base = { ruleId: "R-T", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "OTRO", treatment: "FISCAL_INVOICE", validFrom: "2000-01-01", recordedBy: "system", reason: "prueba" };
+    const base = { ruleId: "R-T", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "OTRO", treatment: "FISCAL_INVOICE", validFrom: "2000-01-01", recordedBy: "system", proposedBy: "system", reason: "prueba" };
     const r = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e20", version: 1, validation: "APPROVED_PENDING_VERIFICATION" });
     await expect(pool.query("UPDATE contable.fiscal_rule SET treatment = 'X' WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
     await expect(pool.query("DELETE FROM contable.fiscal_rule WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
-    await expect(store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e21", version: 2, validation: "VERIFIED" })).rejects.toThrow(/fiscal_rule_verified_reference/);
+    await expect(store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e21", version: 2, validation: "VERIFIED" })).rejects.toThrow(/fiscal_rule_verified_reference|fiscal_rule_review/);
+  });
+});
+
+describe("[K12][R-CORE-014] PostgreSQL: separación entre proponer y verificar en la base (0006)", () => {
+  beforeEach(() => resetDatabase(pool));
+  const base = { ruleId: "R-K12-DB", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "OTRO", treatment: "FISCAL_INVOICE", validFrom: "2000-01-01", reason: "prueba" };
+  const [id1, id2] = ["5b1d7f1e-1c1a-4c51-9a43-3f2f7a1d8e01", "5b1d7f1e-1c1a-4c51-9a43-3f2f7a1d8e02"] as const;
+  it("una versión revisada exige revisor distinto de quien propuso, aunque falle el código", async () => {
+    const store = createPgFiscalRuleStore({ pool });
+    await store.insert({ ...base, id: id1, version: 1, validation: "APPROVED_PENDING_VERIFICATION", recordedBy: "pa-1", proposedBy: "pa-1" });
+    const now = new Date().toISOString();
+    await expect(store.insert({ ...base, id: id2, version: 2, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-1", proposedBy: "pa-1", reviewedBy: "pa-1", reviewedAt: now })).rejects.toThrow(/fiscal_rule_review/);
+    await expect(store.insert({ ...base, id: id2, version: 2, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-3", proposedBy: "pa-3", reviewedBy: "pa-2", reviewedAt: now })).rejects.toThrow(/fiscal_rule_review/);
+    await expect(store.insert({ ...base, id: id2, version: 2, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-2", proposedBy: "pa-1", reviewedBy: "pa-2", reviewedAt: now })).resolves.toMatchObject({ version: 2 });
+  });
+  it("una versión revisada sin una propuesta pendiente justo debajo se rechaza (la siembra no verifica)", async () => {
+    const store = createPgFiscalRuleStore({ pool });
+    const now = new Date().toISOString();
+    await expect(store.insert({ ...base, id: id1, version: 1, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-2", proposedBy: "pa-1", reviewedBy: "pa-2", reviewedAt: now })).rejects.toThrow(/fiscal_rule_review/);
   });
 });
 

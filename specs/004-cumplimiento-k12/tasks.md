@@ -17,9 +17,20 @@ Plan aprobado el 2026-11-22 (`plan.md`, REF-DEC-015). La spec de Q4 en `mijex-fi
   e2e 164/164, lint y build del frontend.
 
 ## 004b · Q2: proponer y verificar, separados (migración 0006)
-- [ ] **T010** Contrato memoria y PG en rojo; migración 0006 validada en la base de pruebas.
-- [ ] **T011** Catálogo: `propose`, `verify` y `reject`; `SELF_VERIFICATION` y `STALE_PROPOSAL`.
-- [ ] **T012** Property: permisos (proponer y verificar, dos PLATFORM_ADMIN distintos del país), auditoría y consola.
+- [x] **T010** Contrato memoria y PG en rojo (11 fallos antes de implementar); migración 0006 validada en la base de
+  pruebas de la librería (55 pruebas PG, incluidas las de separación en la base: revisor igual al proponente, otro
+  proponente, revisión sin propuesta debajo). Nota: las de la base se ejecutaron por primera vez ya con la 0006.
+- [x] **T011** Catálogo: `propose`, `verify` y `reject`; `SELF_VERIFICATION` y `STALE_PROPOSAL`; estado `REJECTED`
+  (una propuesta rechazada no decide); en LIVE decide la última versión verificada o no determinada. `todo` I-K12-3
+  → prueba.
+- [x] **T012** Property: rutas `/versions` (proponer), `/verify` y `/reject` (otro PLATFORM_ADMIN del país; 409
+  `SELF_VERIFICATION` / `STALE_PROPOSAL`, 422 sin referencia), auditoría `FISCAL_RULE_PROPOSED | VERIFIED | REJECTED`,
+  consola con «Proponer versión», «Verificar» y «Rechazar» (prueba de frontend `fiscalRuleCatalog004b`). e2e
+  `fiscal-rule-catalog-routes-003` en rojo (11 fallos) y en verde; `fiscal-rule-catalog-003` adaptada. Property aplica
+  las migraciones de la librería al primer uso (`contableDb.ts`): un servidor de esta rama contra `mijex_property`
+  aplicaría la 0006; ninguno está en marcha (el de `main` no usa la librería).
+  Regresión del 004b (2026-11-22): librería 98 unit + 49→55 PG, build; Property 551 unit, e2e 164/164, frontend
+  349 pruebas.
 - [ ] **T013** Aplicar 0006 en las bases de desarrollo de la rama, con copia previa. **Necesita la aprobación del dueño.**
 
 ## 004c · Q3: contrato del resultado fiscal (migración 0007)

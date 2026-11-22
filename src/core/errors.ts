@@ -18,7 +18,10 @@ export type LedgerErrorCode =
   | "IDEMPOTENCY_CONFLICT"
   | "INVALID_LINK"
   // Spec 003, corte 2: dos correcciones del mismo origen a la vez (se reintenta).
-  | "CONCURRENT_UPDATE";
+  | "CONCURRENT_UPDATE"
+  // Spec 004b (K12): quien propone una regla no la revisa; solo se revisa la última propuesta pendiente.
+  | "SELF_VERIFICATION"
+  | "STALE_PROPOSAL";
 
 /** Error tipado de la librería contable; `details` nunca lleva secretos ni datos personales. */
 export class LedgerError extends Error {

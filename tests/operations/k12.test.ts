@@ -33,13 +33,12 @@ describe("[K12] tratamiento fiscal solo con regla validada (R-CORE-014)", () => 
     expect(decideFiscalIssuance([rule({ reference: undefined })], query())).toMatchObject({ action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED" });
   });
 
-  it("el catálogo no admite VERIFIED sin referencia ni tratamientos nuevos sin verificar", async () => {
+  it("el catálogo no admite VERIFIED sin referencia ni verificar sin una propuesta previa", async () => {
     const catalog = createFiscalRuleCatalog({ store: createMemoryFiscalRuleStore() });
     const base = { ruleId: "R-K12", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", treatment: "FISCAL_INVOICE", validation: "APPROVED_PENDING_VERIFICATION", validFrom: "2026-01-01" } as const;
     await catalog.seed([base], { recordedBy: "system", reason: "carga inicial" });
-    const meta = { recordedBy: "platform-admin", reason: "prueba K12" };
-    await expect(catalog.addVersion({ ...base, validation: "VERIFIED", reference: " " }, meta)).rejects.toMatchObject({ code: "RULE_INVALID" });
-    await expect(catalog.addVersion({ ...base, treatment: "NO_FISCAL_DOCUMENT" }, meta)).rejects.toMatchObject({ code: "RULE_INVALID" });
+    await expect(catalog.propose({ ...base, validation: "VERIFIED", reference: "Norma" }, { recordedBy: "pa-1", reason: "prueba K12" })).rejects.toMatchObject({ code: "RULE_INVALID" });
+    await expect(catalog.verify("R-K12", 1, { reviewedBy: "pa-1", reference: " ", reason: "prueba K12" })).rejects.toMatchObject({ code: "RULE_INVALID" });
   });
 
   it("la revisión fiscal no bloquea el registro de los cobros y pagos", async () => {
@@ -73,6 +72,13 @@ describe("[K12] tratamiento fiscal solo con regla validada (R-CORE-014)", () => 
     expect(decideFiscalIssuance([pending], query({ mode: "SIMULATION" }))).toMatchObject({ action: "ISSUE", simulated: true });
   });
   it.todo("I-K12-2: las reglas fiscales viven en @mijex/fiscal-core; esta librería no guarda un catálogo propio");
-  it.todo("I-K12-3: quien registra una versión de regla no puede verificarla (aprobación separada)");
+  it("I-K12-3 (spec 004b): quien propone una regla no puede verificarla ni rechazarla", async () => {
+    const catalog = createFiscalRuleCatalog({ store: createMemoryFiscalRuleStore() });
+    const base = { ruleId: "R-K12-3", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "COMUNIDAD", treatment: "FISCAL_INVOICE", validation: "APPROVED_PENDING_VERIFICATION", validFrom: "2026-01-01" } as const;
+    await catalog.seed([base], { recordedBy: "system", reason: "carga inicial" });
+    await catalog.propose(base, { recordedBy: "pa-1", reason: "Propuesta" });
+    await expect(catalog.verify("R-K12-3", 2, { reviewedBy: "pa-1", reference: "Norma", reason: "Autoverificación" })).rejects.toMatchObject({ code: "SELF_VERIFICATION" });
+    await expect(catalog.verify("R-K12-3", 2, { reviewedBy: "pa-2", reference: "Norma", reason: "Verificación" })).resolves.toMatchObject({ validation: "VERIFIED", proposedBy: "pa-1", reviewedBy: "pa-2" });
+  });
   it.todo("I-K12-4: el registro comprueba la procedencia y el estado del resultado fiscal antes de registrarlo");
 });

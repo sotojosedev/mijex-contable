@@ -236,8 +236,9 @@ export function exportOperationsCsv(records: readonly OperationRecord[]): string
  * VERIFIED: contrastada con una fuente normativa aplicable. APPROVED_PENDING_VERIFICATION: aprobada
  * funcionalmente por el usuario, sin verificación normativa: nunca basta para un documento real (REF-DEC-015).
  * UNDETERMINED: no hay regla suficiente para decidir el tratamiento.
+ * REJECTED: propuesta revisada y rechazada (spec 004b); no decide nada.
  */
-export type RuleValidation = "VERIFIED" | "APPROVED_PENDING_VERIFICATION" | "UNDETERMINED";
+export type RuleValidation = "VERIFIED" | "APPROVED_PENDING_VERIFICATION" | "UNDETERMINED" | "REJECTED";
 
 /** Tratamiento fiscal de la operación: con documento fiscal o sin él (no toda cuota o alquiler se factura). */
 export type FiscalTreatment = "FISCAL_INVOICE" | "NO_FISCAL_DOCUMENT" | (string & {});
@@ -290,9 +291,14 @@ export interface IssuanceDecision {
  * pagos: solo dice si este documento fiscal se emite, no se emite o espera revisión manual.
  */
 export function decideFiscalIssuance(catalog: readonly FiscalRule[], q: IssuanceQuery): IssuanceDecision {
-  const rule = catalog
-    .filter((r) => r.country === q.country && r.organizationType === q.organizationType && r.operationType === q.operationType && r.validFrom <= q.on && (r.validTo === undefined || q.on < r.validTo))
-    .sort((a, b) => b.validFrom.localeCompare(a.validFrom) || b.version - a.version)[0];
+  // Una propuesta con un rechazo justo encima está cerrada: ni ella ni el rechazo deciden nada.
+  const rejected = new Set(catalog.filter((r) => r.validation === "REJECTED").map((r) => `${r.ruleId}#${String(r.version - 1)}`));
+  const applicable = catalog
+    .filter((r) => r.country === q.country && r.organizationType === q.organizationType && r.operationType === q.operationType && r.validFrom <= q.on && (r.validTo === undefined || q.on < r.validTo) && r.validation !== "REJECTED" && !rejected.has(`${r.ruleId}#${String(r.version)}`))
+    .sort((a, b) => b.validFrom.localeCompare(a.validFrom) || b.version - a.version);
+  // Spec 004b: un documento real usa la última versión revisada (verificada o no determinada); una propuesta pendiente
+  // no cambia nada hasta que la verifique otra persona. En simulación, también las propuestas.
+  const rule = (q.mode === "LIVE" ? applicable.find((r) => r.validation === "VERIFIED" || r.validation === "UNDETERMINED") : undefined) ?? applicable[0];
   if (!rule) return { action: "MANUAL_REVIEW", reason: "NO_RULE" };
   const ref = { ruleId: rule.ruleId, ruleVersion: rule.version, validation: rule.validation, reference: rule.reference };
   const simulated = q.mode === "SIMULATION" ? { simulated: true as const } : {};
@@ -302,4 +308,4 @@ export function decideFiscalIssuance(catalog: readonly FiscalRule[], q: Issuance
   return { action: rule.treatment === "NO_FISCAL_DOCUMENT" ? "NO_FISCAL_DOCUMENT" : "ISSUE", reason: "RULE_APPLIES", ...ref, ...simulated };
 }
 
-export { createFiscalRuleCatalog, createMemoryFiscalRuleStore, type FiscalRuleCatalog, type FiscalRuleStore, type RuleVersionMeta, type StoredFiscalRule } from "./fiscal-rules.js";
+export { createFiscalRuleCatalog, createMemoryFiscalRuleStore, type FiscalRuleCatalog, type FiscalRuleStore, type ReviewMeta, type RuleVersionMeta, type StoredFiscalRule } from "./fiscal-rules.js";
