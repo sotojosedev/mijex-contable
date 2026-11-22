@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Estado | Abierto |
+| Estado | Resuelto (2026-11-22) |
 | Spec | [spec.md](spec.md) |
 | Fecha | 2026-11-22 |
 
@@ -12,10 +12,10 @@
 ## Resumen
 | ID | Pregunta | Stop condition | Estado | Decisión |
 |----|----------|----------------|--------|----------|
-| Q1 | ¿Una regla pendiente de verificación emite fuera de producción? | Sí: regla fiscal (cambia REF-DEC-009) | Abierta | — |
-| Q2 | ¿Cómo se separa proponer y verificar una regla del catálogo? | Sí: datos y permisos (migración) | Abierta | — |
-| Q3 | ¿Qué comprueba el registro sobre el resultado fiscal? | Sí: API pública | Abierta | — |
-| Q4 | ¿Dónde viven las reglas fiscales? | Sí: arquitectura | Abierta | — |
+| Q1 | ¿Una regla pendiente de verificación emite fuera de producción? | Sí: regla fiscal (cambia REF-DEC-009) | Resuelta | Solo en simulaciones y pruebas aisladas con datos ficticios; nunca documentos reales |
+| Q2 | ¿Cómo se separa proponer y verificar una regla del catálogo? | Sí: datos y permisos (migración) | Resuelta | Permisos, estados, versionado y auditoría; nadie verifica su propia propuesta |
+| Q3 | ¿Qué comprueba el registro sobre el resultado fiscal? | Sí: API pública | Resuelta | Procedencia, versión, estado, ámbito e integridad; contrato público estable y pruebas de rechazo |
+| Q4 | ¿Dónde viven las reglas fiscales? | Sí: arquitectura | Resuelta | Autoridad en `@mijex/fiscal-core` con un catálogo fiscal compartido y versionado; sin reglas paralelas en HS ni Property |
 
 ---
 
@@ -37,7 +37,9 @@ en desarrollo (2026-11-22): «fuera de producción» es hoy todo MIJEX.
 **Recomendación.** **A.** Es lo que pide K12 y MIJEX no tiene producción. Las pruebas ya inyectan su propio entorno y
 sus reglas. En desarrollo basta con verificar las pocas reglas del catálogo que se quieran probar.
 
-**Decisión.** _Pendiente._
+**Decisión.** **A con condiciones**, decidida por el dueño el 2026-11-22: las reglas pendientes de verificación solo
+pueden ejecutarse en **simulaciones y pruebas aisladas con datos ficticios**. No pueden generar documentos fiscales
+reales en ningún entorno. Se actualiza REF-DEC-009.
 
 ---
 
@@ -54,7 +56,9 @@ referencia, pero nada impide que quien propuso la regla registre también su ver
 
 **Recomendación.** **A.**
 
-**Decisión.** _Pendiente._
+**Decisión.** **A con condiciones**, decidida por el dueño el 2026-11-22: separación obligatoria entre quien propone
+y quien verifica, mediante **permisos, estados, versionado y auditoría**. Ninguna identidad puede verificar su propia
+propuesta.
 
 ---
 
@@ -72,7 +76,9 @@ procedencia y el estado del resultado fiscal antes de contabilizarlo, sin duplic
 
 **Recomendación.** **A.**
 
-**Decisión.** _Pendiente._
+**Decisión.** **A ampliada**, decidida por el dueño el 2026-11-22: mijex-contable verifica la **procedencia,
+versión, estado, ámbito e integridad** del resultado fiscal, sin duplicar cálculos ni interpretar legislación
+tributaria. Se define un **contrato público estable** y **pruebas de rechazo**.
 
 ---
 
@@ -90,4 +96,15 @@ sitios: el catálogo de la 003 (aquí), las reglas de alquiler 021/055 (Property
 
 **Recomendación.** **A.** Esta spec 004 resuelve Q1–Q3 y congela el catálogo; el traslado va en su propia spec.
 
-**Decisión.** _Pendiente._
+**Decisión.** **A ampliada**, decidida por el dueño el 2026-11-22: la autoridad de las reglas fiscales se
+centraliza en `@mijex/fiscal-core` y en un **catálogo fiscal compartido y versionado**. mijex-contable consume
+resultados validados. Home Services y Property **no mantienen reglas fiscales paralelas**.
+
+---
+
+## Condiciones generales (dueño, 2026-11-22)
+- Se mantienen K1–K12, la compatibilidad multi-país, la trazabilidad, la inmutabilidad y la idempotencia.
+- Antes de implementar migraciones o modificar APIs públicas: identificar los consumidores afectados y presentar el plan
+  de compatibilidad (`plan.md`).
+- Registro: REF-DEC-015 (decisiones de la 004) y REF-DEC-009 actualizada (Q1).
+

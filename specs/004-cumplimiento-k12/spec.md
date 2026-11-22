@@ -2,7 +2,7 @@
 
 | Campo | Valor |
 |-------|-------|
-| Estado | Borrador (2026-11-22). Clarify abierto: [clarify.md](clarify.md) |
+| Estado | En revisión (2026-11-22). Clarify resuelto ([clarify.md](clarify.md), REF-DEC-015); plan: [plan.md](plan.md) |
 | Solicitado por | Dueño, 2026-11-22, al ratificar la constitución v1.1.0 (REF-DEC-014) |
 | Fecha | 2026-11-22 |
 | Países | ES · DO |
@@ -40,10 +40,10 @@ pagos, sin cambiar documentos emitidos y sin duplicar reglas ni cálculos con `@
 ## 4. Criterios de aceptación
 | ID | Historia | Criterio (Dado / Cuando / Entonces) |
 |----|----------|-------------------------------------|
-| CA1 | H1 | **Dado** una regla «pendiente de verificación» **cuando** se decide la emisión en cualquier entorno **entonces** la operación va a revisión manual y el cobro o pago no se bloquea. [NEEDS CLARIFICATION: Q1] |
-| CA2 | H2 | **Dado** una regla propuesta por una persona **cuando** esa misma persona intenta verificarla **entonces** se rechaza, también en la base de datos. [NEEDS CLARIFICATION: Q2] |
-| CA3 | H3 | **Dado** un documento fiscal **cuando** se registra **entonces** queda constancia de su procedencia y estado; uno no definitivo o de procedencia desconocida no se registra como definitivo, y el registro del cobro o pago sigue. [NEEDS CLARIFICATION: Q3] |
-| CA4 | H4 | **Dado** el catálogo de la 003 y las reglas de alquiler de Property **cuando** se resuelve la frontera **entonces** hay un único dueño de las reglas fiscales y esta librería solo consume su resultado. [NEEDS CLARIFICATION: Q4] |
+| CA1 | H1 | **Dado** una regla «pendiente de verificación» **cuando** se decide la emisión de un documento real, en cualquier entorno, **entonces** la operación va a revisión manual y el cobro o pago no se bloquea; solo una simulación o prueba aislada con datos ficticios puede ejecutarla, y nunca produce un documento real. |
+| CA2 | H2 | **Dado** una regla propuesta por una persona **cuando** esa misma persona intenta verificarla **entonces** se rechaza por permisos, por estado y en la base de datos, y el intento queda auditado. |
+| CA3 | H3 | **Dado** un documento fiscal **cuando** se registra **entonces** se verifican su procedencia, versión, estado, ámbito e integridad según un contrato público estable; uno que no los cumple se rechaza con un error tipado o se registra como no definitivo, y el registro del cobro o pago sigue. Sin recalcular impuestos. |
+| CA4 | H4 | **Dado** el catálogo de la 003 y las reglas de alquiler de Property **cuando** se resuelve la frontera **entonces** la autoridad es `@mijex/fiscal-core` con un catálogo compartido y versionado; esta librería, Property y Home Services solo consumen resultados validados. |
 | CA5 | todas | Los documentos emitidos no cambian; las correcciones son documentos o registros nuevos. |
 
 ## 5. Reglas y referencias
@@ -75,7 +75,4 @@ No se crea ninguna regla fiscal nueva: esta spec cambia quién y cómo se valida
 - Las reglas de alquiler de la 055 de Property (validación en curso, spec 062).
 
 ## 9. Preguntas abiertas
-- [NEEDS CLARIFICATION: Q1 — reglas pendientes fuera de producción]
-- [NEEDS CLARIFICATION: Q2 — cómo se separa proponer y verificar]
-- [NEEDS CLARIFICATION: Q3 — qué es «procedencia y estado» del resultado fiscal en el registro]
-- [NEEDS CLARIFICATION: Q4 — dónde viven las reglas fiscales]
+Ninguna: resueltas en `clarify.md` (2026-11-22).
