@@ -12,7 +12,7 @@ manda `AGENTS.md` y se corrige este documento.
 
 | # | Fase | Artefacto | Puerta de salida |
 |---|------|-----------|------------------|
-| 0 | **Memoria** | [`constitucion.md`](constitucion.md), [`memory.md`](memory.md), `AGENTS.md` | Leídos antes de empezar. |
+| 0 | **Memoria** | [`constitucion.md`](constitucion.md) (v1.1.0, ratificada el 2026-11-22), [`memory.md`](memory.md), `AGENTS.md` | Leídos antes de empezar. |
 | 1 | **Specify** | `specs/NNN-slug/spec.md` | Historias y criterios verificables, fuera de alcance, reglas (`R-…`) y referencias (`REF-…`) que crea o modifica. Dudas marcadas `[NEEDS CLARIFICATION]`, sin decisiones técnicas. |
 | 2 | **Clarify** | `specs/NNN-slug/clarify.md` | Ningún `[NEEDS CLARIFICATION]` abierto. Cada *stop condition* (AGENTS.md §4) la resuelve una persona y queda registrada con fecha. |
 | 3 | **Plan** | `specs/NNN-slug/plan.md` | Inventario de lo existente, diseño, contratos, migraciones SQL, seguridad y aislamiento por organización y país, tests, despliegue y vuelta atrás. *Constitution check* superado. |
@@ -81,4 +81,4 @@ condition, no es trivial.**
 |---------|--------|------------|-------|
 | [001-inventario-y-nucleo-contable](../specs/001-inventario-y-nucleo-contable/spec.md) | Aprobada (Clarify 2026-11-17) · fase 1a implementada | spec, clarify, plan, tasks | Núcleo de la librería |
 | [002-conciliacion-bancaria-comun](../specs/002-conciliacion-bancaria-comun/spec.md) | Implementada y conectada en HS y Property (2026-11-17) | spec, tasks | **Sin clarify ni plan** |
-| [003-registro-operaciones-organizaciones](../specs/003-registro-operaciones-organizaciones/spec.md) | Corte 2 implementado (2026-11-22): clarify resuelto (REF-DEC-013), plan, migraciones 0004/0005 y liquidación guardada aprobadas; T001–T050 hechas | spec, clarify, plan, tasks, migraciones-y-regresion, liquidacion-guardada | Producción sin aplicar; T5 (verificar reglas de Property) pendiente con la 055 |
+| [003-registro-operaciones-organizaciones](../specs/003-registro-operaciones-organizaciones/spec.md) | Corte 2 implementado (2026-11-22): clarify resuelto (REF-DEC-013), plan, migraciones 0004/0005 y liquidación guardada aprobadas; T001–T050 hechas | spec, clarify, plan, tasks, migraciones-y-regresion, liquidacion-guardada | Corte 2 cerrado (T090, T095). Reglas del catálogo de Property en «pendiente de verificación»: verificarlas es trabajo del dueño. Ver incumplimientos de K12 en `constitucion.md` |

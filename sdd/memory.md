@@ -18,8 +18,10 @@ Una decisión del dueño que afecta a más de una feature se registra como `REF-
 registro de cambios de `docs/diseno-tecnico.md`. Las decisiones propias de una sola feature se quedan en su
 `clarify.md`.
 
-## Deuda y huecos del proceso conocidos (2026-11-21)
-- Spec 002 sin `clarify.md` ni `plan.md`; la 003 los tiene desde el 2026-11-22 (clarify abierto, plan en borrador).
-- Spec 003, T5 (catálogo de reglas de Property): se solapa con el catálogo de la spec 055 de Property y con las
-  validaciones por país de su spec 062. Hay que reconciliarlo antes de implementarlo, para no duplicar catálogos.
-- La constitución está pendiente de ratificación del dueño.
+## Deuda y huecos del proceso conocidos (2026-11-22)
+- Spec 002 sin `clarify.md` ni `plan.md`.
+- Constitución v1.1.0 ratificada (REF-DEC-014). K12 tiene cuatro incumplimientos conocidos (I-K12-1 a I-K12-4 en
+  `constitucion.md`), pendientes de que el dueño decida cómo resolverlos.
+- Las reglas del catálogo de la 003 siguen «pendientes de verificación»: verificarlas es trabajo del dueño.
+- `npm run lint` y `npm run knip` fallan por ficheros de `.agents/` (skills de terceros, no se tocan); `eslint src tests`
+  queda limpio.

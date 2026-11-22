@@ -5,7 +5,7 @@
 > contradicción. Cada principio sale de [`AGENTS.md`](../AGENTS.md), que sigue siendo la fuente de las reglas
 > operativas. Aquí no se añade nada que no esté ya decidido allí.
 
-Versión: 1.0.0 · Propuesta: 2026-11-21 · **Pendiente de ratificación del dueño**
+Versión: 1.1.0 · Propuesta: 2026-11-21 · **Ratificada por el dueño el 2026-11-22**
 
 Prioridad (AGENTS.md): **cumplimiento legal > corrección > seguridad > compatibilidad de la API > rendimiento >
 comodidad**.
@@ -25,6 +25,7 @@ comodidad**.
 | K9 | **Frontera con lo fiscal.** La emisión, la numeración, VERI*FACTU y el e-CF viven en `@mijex/fiscal-core`; esta librería los consume para asentarlos e informar. | CLAUDE.md | Ningún código de emisión en `src/`. |
 | K10 | **SDD + TDD siempre.** Spec → clarify → plan → tasks; test en rojo antes del código. | §2 | Artefactos de `specs/NNN-slug/` y orden de los commits. |
 | K11 | **Calidad verificable.** Lint, typecheck, tests (unit y PG), build y knip en verde antes de cerrar; documentación al día. | §6 | Resultados registrados en `tasks.md`. |
+| K12 | **Tratamiento fiscal solo con regla validada.** Ningún tratamiento fiscal se aplica sin una regla validada y respaldada por fuentes oficiales. Las excepciones solo eximen o remiten a reglas validadas, y quien propone no aprueba. `@mijex/fiscal-core` es responsable de las reglas y los cálculos fiscales; esta librería valida la procedencia y el estado del resultado fiscal antes de contabilizarlo, sin duplicar reglas ni cálculos. Lo indeterminado no se emite de forma automática: va a revisión sin bloquear los cobros y pagos permitidos. Los documentos emitidos son inmutables. | §7 | Tests `[K12]` (`tests/operations/k12.test.ts`); incumplimientos conocidos abajo. |
 
 ## Gobierno
 - Las enmiendas requieren la aprobación explícita del dueño. Cada una sube la versión (MAJOR si se cambia o elimina
@@ -36,4 +37,16 @@ comodidad**.
 
 | Versión | Fecha | Cambio |
 |---------|-------|--------|
-| 1.0.0 | 2026-11-21 | Propuesta inicial: K1–K11, sacados de `AGENTS.md` y `CLAUDE.md`, sin reglas nuevas. Pendiente de ratificación. |
+| 1.0.0 | 2026-11-21 | Propuesta inicial: K1–K11, sacados de `AGENTS.md` y `CLAUDE.md`, sin reglas nuevas. |
+| 1.1.0 | 2026-11-22 | Ratificada por el dueño, con **K12** (MINOR: principio nuevo; AGENTS.md §7). Origen: decisiones de la spec 063 de Property (excepciones fiscales verificables). |
+
+## Incumplimientos conocidos de K12 (2026-11-22)
+Detectados al ratificar. Se resuelven con specs aprobadas por el dueño; hasta entonces quedan aquí, no se ocultan.
+
+| # | Incumplimiento | Dónde | Choca con |
+|---|----------------|-------|-----------|
+| I-K12-1 | Fuera de producción, una regla del catálogo «aprobada, pendiente de verificación» emite (`decideFiscalIssuance`, test de R-CORE-014). | `src/operations/index.ts` | REF-DEC-009 (decisión anterior del dueño) |
+| I-K12-2 | El catálogo de reglas fiscales de la 003 vive en esta librería (esquema `contable`), no en `@mijex/fiscal-core`. Las reglas de alquiler (021/055) viven en Property. | `src/operations/fiscal-rules.ts`, migración 0004/0005; Property | Frontera de K12 |
+| I-K12-3 | Una versión VERIFIED del catálogo solo guarda quién la registró: no hay aprobación separada de la propuesta. | `src/operations/fiscal-rules.ts` | Separación proponer / aprobar |
+| I-K12-4 | El registro de operaciones no comprueba la procedencia ni el estado del resultado fiscal antes de registrarlo. | `src/operations/index.ts` | Validar procedencia y estado |
+

@@ -81,3 +81,15 @@ Las reglas técnicas propias de la librería (dinero exacto, inmutabilidad, etc.
 - Antes de cerrar: lint + typecheck + tests + build en verde, y revisión con
   `code-review-typescript`. En cambios relevantes: `/code-review` y `/simplify`.
 - Documentación al día: reglas, referencias, fichas de país y `docs/diseno-tecnico.md`.
+
+## 7. Tratamiento fiscal solo con regla validada (dueño, 2026-11-22)
+- Ningún tratamiento fiscal (tipo, exención, retención o documento) se aplica sin una regla **validada** y respaldada
+  por fuentes oficiales (§3).
+- Las excepciones solo **eximen** o **remiten** a reglas validadas; nunca crean porcentajes. Quien propone una regla o
+  excepción **no** puede aprobarla.
+- Frontera: `@mijex/fiscal-core` es responsable de las reglas y los cálculos fiscales. Esta librería valida la
+  **procedencia y el estado** del resultado fiscal antes de contabilizarlo, sin duplicar reglas ni cálculos.
+- Tratamiento indeterminado: no hay emisión fiscal automática y la operación va a **revisión**, sin bloquear los
+  cobros y pagos permitidos.
+- Los documentos emitidos son **inmutables**: se corrigen con documentos nuevos (rectificativa, anulación o reversión).
+
