@@ -6,8 +6,8 @@ import { installFramework, MIJEX_EVENTS, MIJEX_FRAMEWORKS } from "../../src/fram
 import { resetDatabase, testPool } from "./pg-env.js";
 import { createPgOperationsStore } from "../../src/persistence/pg/operations-store.js";
 import { operationsContract } from "../contract/operations.contract.js";
-import { createPgFiscalRuleStore } from "../../src/persistence/pg/fiscal-rule-store.js";
-import { fiscalRulesContract } from "../contract/fiscal-rules.contract.js";
+import { readFile } from "node:fs/promises";
+import type pg from "pg";
 
 const pool = testPool();
 afterAll(() => pool.end());
@@ -22,39 +22,53 @@ operationsContract("PostgreSQL", async () => {
   return createPgOperationsStore({ pool });
 });
 
-fiscalRulesContract("PostgreSQL", async () => {
-  await resetDatabase(pool);
-  return createPgFiscalRuleStore({ pool });
-});
+describe("[K12][R-CORE-014] PostgreSQL: retirada del catálogo fiscal (0008, spec 005)", () => {
+  const sql = (name: string) => readFile(new URL(`../../migrations/${name}`, import.meta.url), "utf8");
+  // Recrea el catálogo tal como lo dejaron 0005 y 0006 dentro de una transacción que se deshace al final.
+  async function withOldCatalog(work: (client: pg.PoolClient) => Promise<void>): Promise<void> {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(await sql("0005_fiscal_rule_catalog.sql"));
+      await client.query(await sql("0006_fiscal_rule_review.sql"));
+      await work(client);
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  }
+  const exists = async (client: pg.PoolClient) =>
+    (await client.query<{ t: string | null; f: string | null }>("SELECT to_regclass('contable.fiscal_rule')::text AS t, to_regprocedure('contable.fiscal_rule_review_guard()')::text AS f")).rows[0];
 
-describe("[R-CORE-014] PostgreSQL: el catálogo fiscal es de solo inserción (0005)", () => {
-  beforeEach(() => resetDatabase(pool));
-  it("no se edita ni se borra, y VERIFIED sin referencia se rechaza en la base", async () => {
-    const store = createPgFiscalRuleStore({ pool });
-    const base = { ruleId: "R-T", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "OTRO", treatment: "FISCAL_INVOICE", validFrom: "2000-01-01", recordedBy: "system", proposedBy: "system", reason: "prueba" };
-    const r = await store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e20", version: 1, validation: "APPROVED_PENDING_VERIFICATION" });
-    await expect(pool.query("UPDATE contable.fiscal_rule SET treatment = 'X' WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
-    await expect(pool.query("DELETE FROM contable.fiscal_rule WHERE id = $1", [r.id])).rejects.toThrow(/solo inserción/);
-    await expect(store.insert({ ...base, id: "7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e21", version: 2, validation: "VERIFIED" })).rejects.toThrow(/fiscal_rule_verified_reference|fiscal_rule_review/);
+  it("las bases migradas ya no tienen el catálogo; 0005 y 0006 siguen en el historial", async () => {
+    const { rows } = await pool.query<{ t: string | null }>("SELECT to_regclass('contable.fiscal_rule')::text AS t");
+    expect(rows[0]?.t).toBeNull();
+    const applied = (await pool.query<{ name: string }>("SELECT name FROM contable.schema_migrations ORDER BY name")).rows.map((r) => r.name);
+    expect(applied).toEqual(expect.arrayContaining(["0005_fiscal_rule_catalog.sql", "0006_fiscal_rule_review.sql", "0008_drop_fiscal_rule_catalog.sql"]));
   });
-});
 
-describe("[K12][R-CORE-014] PostgreSQL: separación entre proponer y verificar en la base (0006)", () => {
-  beforeEach(() => resetDatabase(pool));
-  const base = { ruleId: "R-K12-DB", country: "DO", jurisdiction: "DO", organizationType: "ADMINISTRADOR", operationType: "OTRO", treatment: "FISCAL_INVOICE", validFrom: "2000-01-01", reason: "prueba" };
-  const [id1, id2] = ["5b1d7f1e-1c1a-4c51-9a43-3f2f7a1d8e01", "5b1d7f1e-1c1a-4c51-9a43-3f2f7a1d8e02"] as const;
-  it("una versión revisada exige revisor distinto de quien propuso, aunque falle el código", async () => {
-    const store = createPgFiscalRuleStore({ pool });
-    await store.insert({ ...base, id: id1, version: 1, validation: "APPROVED_PENDING_VERIFICATION", recordedBy: "pa-1", proposedBy: "pa-1" });
-    const now = new Date().toISOString();
-    await expect(store.insert({ ...base, id: id2, version: 2, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-1", proposedBy: "pa-1", reviewedBy: "pa-1", reviewedAt: now })).rejects.toThrow(/fiscal_rule_review/);
-    await expect(store.insert({ ...base, id: id2, version: 2, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-3", proposedBy: "pa-3", reviewedBy: "pa-2", reviewedAt: now })).rejects.toThrow(/fiscal_rule_review/);
-    await expect(store.insert({ ...base, id: id2, version: 2, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-2", proposedBy: "pa-1", reviewedBy: "pa-2", reviewedAt: now })).resolves.toMatchObject({ version: 2 });
+  it("con la tabla vacía, elimina la tabla y su función de guardia y conserva reject_mutation", async () => {
+    await withOldCatalog(async (client) => {
+      expect(await exists(client)).toEqual({ t: "contable.fiscal_rule", f: "contable.fiscal_rule_review_guard()" });
+      await client.query(await sql("0008_drop_fiscal_rule_catalog.sql"));
+      expect(await exists(client)).toEqual({ t: null, f: null });
+      const { rows } = await client.query<{ f: string | null }>("SELECT to_regprocedure('contable.reject_mutation()')::text AS f");
+      expect(rows[0]?.f).toBe("contable.reject_mutation()");
+    });
   });
-  it("una versión revisada sin una propuesta pendiente justo debajo se rechaza (la siembra no verifica)", async () => {
-    const store = createPgFiscalRuleStore({ pool });
-    const now = new Date().toISOString();
-    await expect(store.insert({ ...base, id: id1, version: 1, validation: "VERIFIED", reference: "Norma", recordedBy: "pa-2", proposedBy: "pa-1", reviewedBy: "pa-2", reviewedAt: now })).rejects.toThrow(/fiscal_rule_review/);
+
+  it("con filas, falla y no borra nada", async () => {
+    await withOldCatalog(async (client) => {
+      await client.query(
+        `INSERT INTO contable.fiscal_rule (id, rule_id, version, country, jurisdiction, organization_type, operation_type, treatment, validation, valid_from, recorded_by, reason, proposed_by)
+         VALUES ('7d0c7a52-0f8a-4c51-9a43-3f2f7a1d8e20', 'R-T', 1, 'DO', 'DO', 'ADMINISTRADOR', 'OTRO', 'FISCAL_INVOICE', 'APPROVED_PENDING_VERIFICATION', '2000-01-01', 'system', 'prueba', 'system')`,
+      );
+      await client.query("SAVEPOINT antes");
+      await expect(client.query(await sql("0008_drop_fiscal_rule_catalog.sql"))).rejects.toThrow(/tiene filas/);
+      await client.query("ROLLBACK TO SAVEPOINT antes");
+      expect(await exists(client)).toEqual({ t: "contable.fiscal_rule", f: "contable.fiscal_rule_review_guard()" });
+      expect((await client.query("SELECT 1 FROM contable.fiscal_rule")).rowCount).toBe(1);
+    });
   });
 });
 

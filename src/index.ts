@@ -9,21 +9,8 @@ export { buildIr17Summary, withholdingsOfPeriod, type Ir17Summary } from "./repo
 export {
   createMemoryOperationsStore,
   createOperationsRegister,
-  decideFiscalIssuance,
   exportOperationsCsv,
   type CorrectionMeta,
-  createFiscalRuleCatalog,
-  createMemoryFiscalRuleStore,
-  type FiscalRuleCatalog,
-  type FiscalRuleStore,
-  type RuleVersionMeta,
-  type StoredFiscalRule,
-  type FiscalRule,
-  type FiscalTreatment,
-  type IssuanceDecision,
-  type IssuanceQuery,
-  type IssuanceReason,
-  type RuleValidation,
   type OperationInput,
   type OperationKind,
   type OperationNature,
@@ -31,9 +18,9 @@ export {
   type OperationRecord,
   type OperationsRegister,
   type OperationsStore,
-  // Spec 004b y 004c (K12).
-  type ReviewMeta,
+  // Spec 004c y 005 (K12): resultado fiscal y reglas de fiscal-core que lo decidieron.
   FISCAL_RESULT_CONTRACT_VERSION,
   type FiscalResultEnvelope,
+  type FiscalRuleRef,
   type RecordedFiscalResult,
 } from "./operations/index.js";

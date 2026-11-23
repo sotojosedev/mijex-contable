@@ -87,8 +87,10 @@ Las reglas técnicas propias de la librería (dinero exacto, inmutabilidad, etc.
   por fuentes oficiales (§3).
 - Las excepciones solo **eximen** o **remiten** a reglas validadas; nunca crean porcentajes. Quien propone una regla o
   excepción **no** puede aprobarla.
-- Frontera: `@mijex/fiscal-core` es responsable de las reglas y los cálculos fiscales. Esta librería valida la
-  **procedencia y el estado** del resultado fiscal antes de contabilizarlo, sin duplicar reglas ni cálculos.
+- Frontera: `@mijex/fiscal-core` es la **única fuente autorizada** de reglas y cálculos fiscales (catálogo con
+  propuesta, verificación y publicación por personas distintas). Esta librería **no** guarda, decide ni duplica reglas
+  fiscales (spec 005, REF-DEC-016): valida la **procedencia, el estado, la versión y las reglas usadas** del resultado
+  fiscal (`FiscalResultEnvelope`) antes de contabilizarlo.
 - Tratamiento indeterminado: no hay emisión fiscal automática y la operación va a **revisión**, sin bloquear los
   cobros y pagos permitidos.
 - Los documentos emitidos son **inmutables**: se corrigen con documentos nuevos (rectificativa, anulación o reversión).

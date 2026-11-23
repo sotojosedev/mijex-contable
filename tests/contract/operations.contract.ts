@@ -242,5 +242,52 @@ export function operationsContract(name: string, makeStore: () => Promise<Operat
         expect(record.fiscal).toMatchObject({ submissionStatus: "ACCEPTED", definitive: true });
       });
     });
+
+    describe("[K12][R-CORE-018] reglas de fiscal-core que decidieron el documento (spec 005)", () => {
+      const refA = { type: "ISSUANCE", ruleId: "PROPERTY/ES/ADMINISTRADOR/ARRIENDO", version: 3 };
+      const refB = { type: "WITHHOLDING", ruleId: "DO/ISR/ALQUILER", version: 1 };
+
+      it("se validan y se guardan con el registro, ordenadas por regla; se releen igual", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const r = await reg.record(op({ fiscal: envelope({ ruleRefs: [refA, refB] }) }));
+        expect(r.fiscal?.ruleRefs).toEqual([refB, refA]);
+        expect((await reg.list("org-a"))[0]?.fiscal?.ruleRefs).toEqual([refB, refA]);
+      });
+
+      it("sin referencias o con la lista vacía, el registro es el de siempre (sin el campo)", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const none = await reg.record(op());
+        const plain = await reg.record(op({ source: { system: "property", id: "inv-2" }, fiscal: envelope() }));
+        const empty = await reg.record(op({ source: { system: "property", id: "inv-3" }, fiscal: envelope({ ruleRefs: [] }) }));
+        expect(none.fiscal).toBeNull();
+        expect(plain.fiscal && "ruleRefs" in plain.fiscal).toBe(false);
+        expect(empty.fiscal && "ruleRefs" in empty.fiscal).toBe(false);
+      });
+
+      it("mal formadas o repetidas: FISCAL_RULE_REF y no se guarda nada", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const bad: unknown[] = [
+          "no-es-lista",
+          [{ ...refA, type: "issuance" }],
+          [{ ...refA, ruleId: " " }],
+          [{ ...refA, version: 0 }],
+          [{ ...refA, version: 1.5 }],
+          [{ ...refA, version: "3" }],
+          [null],
+          [refA, { ...refA, version: 4 }],
+        ];
+        for (const ruleRefs of bad) {
+          await expect(reg.record(op({ fiscal: envelope({ ruleRefs: ruleRefs as never }) }))).rejects.toMatchObject({ code: "FISCAL_RULE_REF" });
+        }
+        expect(await reg.list("org-a")).toEqual([]);
+      });
+
+      it("idempotente con las mismas referencias en cualquier orden; otras referencias son otro resultado", async () => {
+        const reg = createOperationsRegister({ store: await makeStore() });
+        const first = await reg.record(op({ fiscal: envelope({ ruleRefs: [refA, refB] }) }));
+        expect((await reg.record(op({ fiscal: envelope({ ruleRefs: [refB, refA] }) }))).id).toBe(first.id);
+        await expect(reg.record(op({ fiscal: envelope({ ruleRefs: [{ ...refA, version: 4 }] }) }))).rejects.toMatchObject({ code: "IDEMPOTENCY_CONFLICT" });
+      });
+    });
   });
 }

@@ -60,11 +60,25 @@ export interface FiscalResultEnvelope {
   readonly submissionStatus: string;
   /** Huella del contenido canónico; si se aporta `content`, se comprueba que coincide. `content` no se guarda. */
   readonly integrity: { readonly algorithm: "SHA-256"; readonly digest: string; readonly content?: string | undefined };
+  /**
+   * Spec 005 (R-CORE-018): reglas de `@mijex/fiscal-core` que decidieron el documento, tal como las guarda fiscal-core
+   * al emitirlo. Opcional: hay documentos sin regla del catálogo. Se validan y se guardan; no se interpretan.
+   */
+  readonly ruleRefs?: readonly FiscalRuleRef[] | undefined;
+}
+
+/** Referencia a una versión de una regla de fiscal-core (tipo, identificador y versión). */
+export interface FiscalRuleRef {
+  readonly type: string;
+  readonly ruleId: string;
+  readonly version: number;
 }
 
 /** Lo que queda registrado: el sobre sin el contenido y si el resultado es definitivo. */
-export interface RecordedFiscalResult extends Omit<FiscalResultEnvelope, "integrity"> {
+export interface RecordedFiscalResult extends Omit<FiscalResultEnvelope, "integrity" | "ruleRefs"> {
   readonly integrity: { readonly algorithm: "SHA-256"; readonly digest: string };
+  /** Ordenadas por regla; ausente si el sobre no traía ninguna. */
+  readonly ruleRefs?: readonly FiscalRuleRef[];
   readonly definitive: boolean;
 }
 
@@ -76,7 +90,7 @@ const DEFINITIVE_FISCAL: readonly string[] = ["ACTIVE", "PARTIALLY_CORRECTED", "
 function checkFiscal(input: OperationInput): RecordedFiscalResult | null {
   const f = input.fiscal;
   if (!f) return null;
-  const fail = (code: "FISCAL_PROVENANCE" | "FISCAL_VERSION" | "FISCAL_STATUS" | "FISCAL_SCOPE" | "FISCAL_INTEGRITY", message: string): never => {
+  const fail = (code: "FISCAL_PROVENANCE" | "FISCAL_VERSION" | "FISCAL_STATUS" | "FISCAL_SCOPE" | "FISCAL_INTEGRITY" | "FISCAL_RULE_REF", message: string): never => {
     throw new LedgerError(code, message, { source: `${input.source.system}:${input.source.id}` });
   };
   if (f.contractVersion !== FISCAL_RESULT_CONTRACT_VERSION) fail("FISCAL_VERSION", "Versión del contrato del resultado fiscal no admitida");
@@ -96,8 +110,29 @@ function checkFiscal(input: OperationInput): RecordedFiscalResult | null {
   if (f.integrity.content !== undefined && createHash("sha256").update(f.integrity.content).digest("hex") !== f.integrity.digest) {
     fail("FISCAL_INTEGRITY", "La huella no coincide con el contenido del documento");
   }
-  const { integrity, ...rest } = f;
-  return { ...rest, integrity: { algorithm: integrity.algorithm, digest: integrity.digest }, definitive: DEFINITIVE_SUBMISSION.includes(f.submissionStatus) && DEFINITIVE_FISCAL.includes(f.fiscalStatus) };
+  const ruleRefs = checkRuleRefs(f.ruleRefs, () => fail("FISCAL_RULE_REF", "Referencias de reglas fiscales mal formadas o repetidas"));
+  const { integrity, ruleRefs: _refs, ...rest } = f;
+  return {
+    ...rest,
+    integrity: { algorithm: integrity.algorithm, digest: integrity.digest },
+    ...(ruleRefs.length > 0 ? { ruleRefs } : {}),
+    definitive: DEFINITIVE_SUBMISSION.includes(f.submissionStatus) && DEFINITIVE_FISCAL.includes(f.fiscalStatus),
+  };
+}
+
+/** R-CORE-018: lista de referencias bien formadas, una por regla, ordenada por regla. Llega de fuera: no se fía del tipo. */
+function checkRuleRefs(refs: unknown, fail: () => never): FiscalRuleRef[] {
+  if (refs === undefined) return [];
+  if (!Array.isArray(refs)) return fail();
+  const out = refs.map((ref: unknown): FiscalRuleRef => {
+    if (typeof ref !== "object" || ref === null) return fail();
+    const { type, ruleId, version } = ref as Record<string, unknown>;
+    if (typeof type !== "string" || !/^[A-Z][A-Z_]*$/.test(type) || typeof ruleId !== "string" || !ruleId.trim() || typeof version !== "number" || !Number.isInteger(version) || version < 1) return fail();
+    return { type, ruleId, version };
+  });
+  if (new Set(out.map((r) => r.ruleId)).size !== out.length) return fail();
+  // Orden binario (no depende del idioma del sistema): el registro guardado es siempre el mismo.
+  return out.sort((a, b) => (a.ruleId < b.ruleId ? -1 : a.ruleId > b.ruleId ? 1 : 0));
 }
 
 export interface OperationRecord extends Omit<OperationInput, "links" | "nature" | "fiscal"> {
@@ -150,8 +185,12 @@ function sameFiscal(a: RecordedFiscalResult | null, b: RecordedFiscalResult | nu
   if (a === null || b === null) return a === b;
   return a.contractVersion === b.contractVersion && a.provenance === b.provenance && a.documentId === b.documentId && a.documentNumber === b.documentNumber &&
     a.issuerId === b.issuerId && a.organizationId === b.organizationId && a.country === b.country && a.fiscalStatus === b.fiscalStatus &&
-    a.submissionStatus === b.submissionStatus && a.integrity.digest === b.integrity.digest && a.definitive === b.definitive;
+    a.submissionStatus === b.submissionStatus && a.integrity.digest === b.integrity.digest && a.definitive === b.definitive &&
+    sameRuleRefs(a.ruleRefs ?? [], b.ruleRefs ?? []);
 }
+
+const sameRuleRefs = (a: readonly FiscalRuleRef[], b: readonly FiscalRuleRef[]): boolean =>
+  a.length === b.length && a.every((r, i) => r.type === b[i]?.type && r.ruleId === b[i].ruleId && r.version === b[i].version);
 
 const sameData = (a: OperationRecord, b: OperationInput): boolean =>
   a.organizationId === b.organizationId && a.kind === b.kind && a.occurredOn === b.occurredOn && a.amount === b.amount && a.currency === b.currency &&
@@ -309,83 +348,3 @@ export function exportOperationsCsv(records: readonly OperationRecord[]): string
   );
   return [HEADER.join(";"), ...lines].join("\r\n");
 }
-
-// --- Catálogo de reglas fiscales y decisión de emisión (R-CORE-014, REF-DEC-009) ---
-
-/**
- * VERIFIED: contrastada con una fuente normativa aplicable. APPROVED_PENDING_VERIFICATION: aprobada
- * funcionalmente por el usuario, sin verificación normativa: nunca basta para un documento real (REF-DEC-015).
- * UNDETERMINED: no hay regla suficiente para decidir el tratamiento.
- * REJECTED: propuesta revisada y rechazada (spec 004b); no decide nada.
- */
-export type RuleValidation = "VERIFIED" | "APPROVED_PENDING_VERIFICATION" | "UNDETERMINED" | "REJECTED";
-
-/** Tratamiento fiscal de la operación: con documento fiscal o sin él (no toda cuota o alquiler se factura). */
-export type FiscalTreatment = "FISCAL_INVOICE" | "NO_FISCAL_DOCUMENT" | (string & {});
-
-export interface FiscalRule {
-  readonly ruleId: string;
-  readonly version: number;
-  readonly country: string;
-  readonly jurisdiction: string;
-  readonly organizationType: string;
-  readonly operationType: string;
-  readonly treatment: FiscalTreatment;
-  readonly reference?: string | undefined;
-  readonly validation: RuleValidation;
-  readonly validFrom: CivilDate;
-  readonly validTo?: CivilDate | undefined;
-}
-
-export interface IssuanceQuery {
-  readonly country: string;
-  readonly organizationType: string;
-  readonly operationType: string;
-  readonly on: CivilDate;
-  /**
-   * LIVE: documento fiscal real, en cualquier entorno; solo con una regla VERIFIED con referencia (K12, REF-DEC-015).
-   * SIMULATION: prueba aislada con datos ficticios; una regla pendiente se ejecuta y la decisión sale `simulated`.
-   */
-  readonly mode: "LIVE" | "SIMULATION";
-  /** Datos esenciales que faltan para determinar el tratamiento (p. ej. identificación fiscal del comprador). */
-  readonly missingData: readonly string[];
-}
-
-export type IssuanceReason = "RULE_APPLIES" | "NO_RULE" | "RULE_UNDETERMINED" | "RULE_NOT_VERIFIED" | "MISSING_DATA";
-
-export interface IssuanceDecision {
-  /** ISSUE: emitir; NO_FISCAL_DOCUMENT: la operación no lleva documento fiscal; MANUAL_REVIEW: solo esta emisión queda retenida. */
-  readonly action: "ISSUE" | "NO_FISCAL_DOCUMENT" | "MANUAL_REVIEW";
-  readonly reason: IssuanceReason;
-  readonly ruleId?: string | undefined;
-  readonly ruleVersion?: number | undefined;
-  readonly validation?: RuleValidation | undefined;
-  readonly reference?: string | undefined;
-  readonly missingData?: readonly string[] | undefined;
-  /** Solo en SIMULATION: la decisión no autoriza ningún documento fiscal real. */
-  readonly simulated?: true | undefined;
-}
-
-/**
- * Decide la emisión fiscal de UNA operación. Nunca bloquea el registro económico, los cobros ni los
- * pagos: solo dice si este documento fiscal se emite, no se emite o espera revisión manual.
- */
-export function decideFiscalIssuance(catalog: readonly FiscalRule[], q: IssuanceQuery): IssuanceDecision {
-  // Una propuesta con un rechazo justo encima está cerrada: ni ella ni el rechazo deciden nada.
-  const rejected = new Set(catalog.filter((r) => r.validation === "REJECTED").map((r) => `${r.ruleId}#${String(r.version - 1)}`));
-  const applicable = catalog
-    .filter((r) => r.country === q.country && r.organizationType === q.organizationType && r.operationType === q.operationType && r.validFrom <= q.on && (r.validTo === undefined || q.on < r.validTo) && r.validation !== "REJECTED" && !rejected.has(`${r.ruleId}#${String(r.version)}`))
-    .sort((a, b) => b.validFrom.localeCompare(a.validFrom) || b.version - a.version);
-  // Spec 004b: un documento real usa la última versión revisada (verificada o no determinada); una propuesta pendiente
-  // no cambia nada hasta que la verifique otra persona. En simulación, también las propuestas.
-  const rule = (q.mode === "LIVE" ? applicable.find((r) => r.validation === "VERIFIED" || r.validation === "UNDETERMINED") : undefined) ?? applicable[0];
-  if (!rule) return { action: "MANUAL_REVIEW", reason: "NO_RULE" };
-  const ref = { ruleId: rule.ruleId, ruleVersion: rule.version, validation: rule.validation, reference: rule.reference };
-  const simulated = q.mode === "SIMULATION" ? { simulated: true as const } : {};
-  if (rule.validation === "UNDETERMINED") return { action: "MANUAL_REVIEW", reason: "RULE_UNDETERMINED", ...ref, ...simulated };
-  if (q.mode === "LIVE" && (rule.validation !== "VERIFIED" || !rule.reference?.trim())) return { action: "MANUAL_REVIEW", reason: "RULE_NOT_VERIFIED", ...ref };
-  if (q.missingData.length > 0) return { action: "MANUAL_REVIEW", reason: "MISSING_DATA", missingData: [...q.missingData], ...ref, ...simulated };
-  return { action: rule.treatment === "NO_FISCAL_DOCUMENT" ? "NO_FISCAL_DOCUMENT" : "ISSUE", reason: "RULE_APPLIES", ...ref, ...simulated };
-}
-
-export { createFiscalRuleCatalog, createMemoryFiscalRuleStore, type FiscalRuleCatalog, type FiscalRuleStore, type ReviewMeta, type RuleVersionMeta, type StoredFiscalRule } from "./fiscal-rules.js";
