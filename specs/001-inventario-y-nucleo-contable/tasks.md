@@ -18,7 +18,12 @@
 - [x] T10 Librería: `ledger.charts`, `ledger.entryBySource`, `ensureFramework`, `frameworkForCountry`.
 - [x] T11 HS spec 039: traductor de asientos, réplica idempotente (job y script) y comparador por rol. Verificado en memoria y en PostgreSQL real (base de pruebas).
 - [x] T12 (desarrollo) Modo sombra activo en la base de desarrollo de HS. Comparador el 2026-11-18: ES coincide en todos los roles; RD sin datos.
-- [ ] T12b Producción: activar `CONTABLE_ENABLED` y aplicar las migraciones en cada entorno. **Necesita aprobación expresa del usuario.**
+- [x] T12b (desarrollo, 2026-11-24) Verificado: `CONTABLE_ENABLED=1` en `wt-hs-contingencia/backend/.env` (base
+  `mijex_contingencia_dev`); Property aplica el esquema `contable` al arrancar (`contableDb.ts`, sin bandera) sobre
+  `mijex_property`. Migraciones 0001–0008 en ambas bases, con la huella SHA-256 idéntica a `migrations/`; sin
+  `contable.fiscal_rule`. Librería: unitarias 88/88, PostgreSQL 53/53, typecheck. La base compartida `mijex` no se tocó.
+- [ ] T12c Staging y producción: activar `CONTABLE_ENABLED` y aplicar las migraciones. **Parado: MIJEX solo en
+  desarrollo; necesita aprobación expresa del usuario.**
 - [x] T13 Asientos sin equivalente:
   - Los reajustes `settled:*` se replican como reversión más estado acumulado (spec 039).
   - Los cobros antiguos se fusionan con `netEntry`.

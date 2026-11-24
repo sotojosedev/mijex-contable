@@ -124,13 +124,26 @@ Registro de operaciones y catálogo fiscal (spec 003):
 
 ## 6. Integraciones
 
-- `@sotojosedev/fiscal-core`, enlazado en local (`file:../wt-fiscal-contingencia`) hasta que
-  se publique la 0.5.0: se reutilizan `migrate` y, en las próximas fases, el dinero (`money.ts`).
-- Pendiente: que HS y Property emitan eventos de negocio a la librería (fase 2).
+- `@sotojosedev/fiscal-core`, enlazado en local (`file:../wt-fiscal-contingencia`) hasta que se publique la 0.5.0. Se
+  reutilizan `migrate` (`@sotojosedev/fiscal-core/pg`), el dinero (`formatMinor`, `parseMinor`) y los estados fiscales
+  (`FISCAL_STATUSES`, `SUBMISSION_STATUSES`).
+- **Home Services:** modo sombra (spec 039: réplica idempotente del registro de hechos y comparador por rol) y
+  Contabilidad leída de la librería (spec 040). La librería genera los formatos DGII 606/607/608 y el IR-17.
+- **Property:** registro de operaciones de organizaciones (spec 003) con el resultado fiscal de fiscal-core
+  (`FiscalResultEnvelope`, specs 004c y 005).
+- HS y Property aplican las migraciones del esquema `contable` al arrancar: publicar una versión de la librería
+  equivale a migrar ese entorno.
 
 ## 7. Pendiente y decisiones abiertas
 
-_Ninguna registrada._
+| Tema | Estado | Quién decide |
+|------|--------|--------------|
+| Staging y producción (001 T12c, 005 T060) | Parado: MIJEX solo en desarrollo (dueño, 2026-11-22). | Dueño |
+| Publicar la versión mayor de esta librería y fiscal-core 0.5.0 | Pendiente; hasta entonces, enlaces `file:`. | Dueño |
+| Multiempresa: entidades contables de organizaciones y comunidades (Clarify Q1 de la 001) | Sin empezar; necesita fuentes oficiales. | Dueño |
+| IR-17 (R-DO-206): formulario y plazo del ITBIS retenido; prórroga por fin de semana o feriado | `[verificar]` con la DGII. | Dueño / DGII |
+| Spec 062 de Property (R-CORE-016 y R-CORE-017) | Reglas creadas; implementación pendiente en Property (la migración E necesita aprobación). | Dueño |
+| `lint` y `knip` señalan los skills de terceros de `.agents/` | Deuda conocida (`sdd/memory.md`). | — |
 
 ## 8. Registro de cambios
 
@@ -187,3 +200,5 @@ _Ninguna registrada._
 | 2026-11-22 | Spec 004b (K12, REF-DEC-015) · **cambio incompatible** (MAJOR) en el catálogo fiscal: `addVersion` se sustituye por `propose` (pendiente o no determinada), `verify` (con referencia) y `reject`; nadie revisa su propia propuesta (`SELF_VERIFICATION`) y solo se revisa la última propuesta pendiente (`STALE_PROPOSAL`). Estado nuevo `REJECTED`. Un documento real usa la última versión verificada o no determinada. Migración **0006** (aditiva): `proposed_by`, `reviewed_by`, `reviewed_at`, CHECK de revisión y trigger `fiscal_rule_review_guard` (la siembra ni una inserción directa pueden verificar). Property adaptado: rutas `/admin/fiscal/rule-catalog/versions`, `/verify` y `/reject` con dos PLATFORM_ADMIN del país, auditadas, y la consola con «Proponer», «Verificar» y «Rechazar». Cierra I-K12-3. | 004 | §4 |
 | 2026-11-22 | Spec 004c (K12, REF-DEC-015) · contrato público `FiscalResultEnvelope` (`contractVersion` 1, MINOR: opcional) en `OperationInput.fiscal`: el registro verifica procedencia (`FISCAL_CORE` o `EXTERNAL`, este solo manual), versión, estado (los de fiscal-core), ámbito (organización, país, número) e integridad (SHA-256; si llega el contenido, se comprueba), con errores `FISCAL_PROVENANCE`, `FISCAL_VERSION`, `FISCAL_STATUS`, `FISCAL_SCOPE` y `FISCAL_INTEGRITY`. Guarda el sobre sin el contenido y si es definitivo (envío aceptado o sin obligación de remitir, documento vigente); un cambio es una corrección. CSV con `documento_fiscal` y `fiscal_definitivo` al final. Migración **0007** (aditiva). Property envía el sobre de las cuotas emitidas con la librería, con la huella de la serialización canónica del documento de fiscal-core (decisión del dueño: provisional hasta la huella oficial, spec de Q4). Cierra I-K12-4. | 004 | §4 |
 | 2026-11-23 | Spec 005 (K12, REF-DEC-016) · **cambio incompatible** (MAJOR): se retiran el catálogo fiscal y la decisión de emisión (`createFiscalRuleCatalog`, `createMemoryFiscalRuleStore`, `createPgFiscalRuleStore`, `decideFiscalIssuance` y sus tipos; códigos `SELF_VERIFICATION` y `STALE_PROPOSAL`). Viven en `@mijex/fiscal-core` (spec 014: propuesta, verificación y publicación por tres personas; referencia de la regla en cada documento). Ningún consumidor los usaba (búsqueda en todos los repositorios; compilación de Property y HS). Migración **0008**: elimina `contable.fiscal_rule` (vacía en todas las bases; sin dependencias externas) y aborta si tuviera filas; aplicada en `mijex_property` y `mijex_contingencia_dev` con copia previa. `FiscalResultEnvelope` gana `ruleRefs` opcional (R-CORE-018, código `FISCAL_RULE_REF`); Property lo rellena con las referencias de fiscal-core. Cierra I-K12-2 en esta librería. Pendiente del dueño: staging/producción y publicación de la versión mayor. | 005 | §4, §5 |
+| 2026-11-24 | §6 al día (HS y Property ya integrados; lo que se reutiliza de fiscal-core) y §7 con las decisiones abiertas. Borrada la copia antigua `skills-lock 2.json`. | — | §6, §7 |
+| 2026-11-24 | 001 T12b cerrada en desarrollo: `CONTABLE_ENABLED=1` en HS y migraciones 0001–0008 con huella idéntica en `mijex_contingencia_dev` y `mijex_property`. Staging y producción pasan a T12c (parada). | 001 | §7 |
