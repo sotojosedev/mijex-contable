@@ -4,8 +4,9 @@ import type { CivilDate, Minor } from "../../core/types.js";
 // R-DO-206: retenciones del mes para el IR-17 (REF-DO-006, página ISR de la DGII: «a más tardar los
 // días 10 del mes siguiente al periodo declarado»). Si ese día no es laborable, vence el siguiente día
 // laborable (REF-DO-037, Calendario del Contribuyente 2026). Los feriados son dato del llamador, nunca
-// una lista fija aquí. El ITBIS retenido se informa sin fecha: la Norma General 02-05 art. 10 remite
-// a «los plazos y formas establecidos en el Código Tributario» (REF-DO-039) y el formulario sigue [verificar].
+// una lista fija aquí. El ITBIS retenido se declara «como impuesto retenido a terceros» en el período
+// correspondiente (Decreto 293-11 art. 25 párrafo III), es decir, en la declaración jurada mensual del
+// ITBIS, dentro de los primeros 20 días del mes siguiente (art. 24; REF-DO-011).
 
 const PERIOD = /^(\d{4})(0[1-9]|1[0-2])$/;
 
@@ -46,6 +47,8 @@ export interface Ir17Summary {
   /** Día 10 del mes siguiente (REF-DO-006) o, si no es laborable, el siguiente día laborable (REF-DO-037). */
   readonly dueDate: CivilDate;
   readonly itbisWithheld: Minor;
+  /** Día 20 del mes siguiente o el siguiente laborable: declaración mensual del ITBIS (Decreto 293-11 arts. 24 y 25). */
+  readonly itbisWithheldDueDate: CivilDate;
   readonly notes: readonly string[];
 }
 
@@ -74,14 +77,16 @@ export function buildIr17Summary(input: {
   const invalid = holidays.find((h) => !CIVIL.test(h));
   if (invalid !== undefined) throw new RangeError(`Feriado no válido (AAAA-MM-DD): ${invalid}`);
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
+  const nonWorking = new Set(holidays);
   return {
     period: input.period,
     isrWithheld: input.isrWithheld,
-    dueDate: nextWorkingDay(next.year, next.month, 10, new Set(holidays)),
+    dueDate: nextWorkingDay(next.year, next.month, 10, nonWorking),
     itbisWithheld: input.itbisWithheld,
+    itbisWithheldDueDate: nextWorkingDay(next.year, next.month, 20, nonWorking),
     notes: [
       "Retenciones de ISR: IR-17, a más tardar el día 10 del mes siguiente; si es fin de semana o feriado, el siguiente día laborable (DGII, Impuesto sobre la Renta y Calendario del Contribuyente).",
-      "ITBIS retenido: la Norma General 02-05 art. 10 remite a los plazos y formas del Código Tributario; [verificar] el formulario y el plazo (el ITBIS mensual vence el día 20).",
+      "ITBIS retenido: se declara como impuesto retenido a terceros en la declaración jurada mensual del ITBIS, a más tardar el día 20 del mes siguiente o el siguiente día laborable (Decreto 293-11 arts. 24 y 25).",
     ],
   };
 }

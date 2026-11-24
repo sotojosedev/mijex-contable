@@ -26,10 +26,10 @@ describe("[R-DO-206] IR-17: retenciones de ISR del mes, a más tardar el día 10
     expect(await withholdingsOfPeriod(ledger, entity.id, { isr: "2130", itbis: "2140" }, "202611")).toEqual({ isr: 1_500n, itbis: 18_000n });
   });
 
-  it("vence el día 10 del mes siguiente (también de diciembre a enero); el ITBIS retenido se informa sin inventar su plazo", () => {
+  it("vence el día 10 del mes siguiente (también de diciembre a enero); el ITBIS retenido vence con la declaración mensual del ITBIS", () => {
     expect(buildIr17Summary({ period: "202611", isrWithheld: 1_500n, itbisWithheld: 18_000n })).toEqual({
-      period: "202611", isrWithheld: 1_500n, dueDate: "2026-12-10", itbisWithheld: 18_000n,
-      notes: [expect.stringContaining("IR-17"), expect.stringContaining("[verificar]")],
+      period: "202611", isrWithheld: 1_500n, dueDate: "2026-12-10", itbisWithheld: 18_000n, itbisWithheldDueDate: "2026-12-21",
+      notes: [expect.stringContaining("IR-17"), expect.stringContaining("ITBIS retenido")],
     });
     expect(buildIr17Summary({ period: "202601", isrWithheld: 0n, itbisWithheld: 0n }).dueDate).toBe("2026-02-10");
     expect(() => buildIr17Summary({ period: "2026-11", isrWithheld: 0n, itbisWithheld: 0n })).toThrow();
@@ -53,9 +53,16 @@ describe("[R-DO-206] IR-17: retenciones de ISR del mes, a más tardar el día 10
     expect(() => buildIr17Summary({ ...base, holidays: ["2026-3-10"] })).toThrow(RangeError);
   });
 
-  it("el ITBIS retenido sigue sin formulario ni plazo propios; la nota cita la norma 02-05 art. 10 (REF-DO-039)", () => {
-    const { notes } = buildIr17Summary({ period: "202611", isrWithheld: 0n, itbisWithheld: 1n });
+  // REF-DO-011: Decreto 293-11 art. 24 (declaración mensual del ITBIS, primeros 20 días) y art. 25 párrafo III.
+  it("el ITBIS retenido se declara como impuesto retenido a terceros en la declaración mensual del ITBIS: día 20 o el siguiente laborable", () => {
+    const summary = (period: string, holidays?: readonly string[]) =>
+      buildIr17Summary({ period, isrWithheld: 0n, itbisWithheld: 1n, ...(holidays ? { holidays } : {}) });
+    expect(summary("202611").itbisWithheldDueDate).toBe("2026-12-21"); // domingo 20 → lunes 21
+    expect(summary("202605").itbisWithheldDueDate).toBe("2026-06-22"); // sábado 20 → lunes 22
+    expect(summary("202606").itbisWithheldDueDate).toBe("2026-07-20");
+    expect(summary("202606", ["2026-07-20"]).itbisWithheldDueDate).toBe("2026-07-21");
+    const { notes } = summary("202611");
     expect(notes.some((n) => n.includes("feriado") && !n.includes("[verificar]"))).toBe(true);
-    expect(notes.some((n) => n.includes("ITBIS retenido") && n.includes("[verificar]") && n.includes("02-05"))).toBe(true);
+    expect(notes.some((n) => n.includes("ITBIS retenido") && n.includes("293-11") && !n.includes("[verificar]"))).toBe(true);
   });
 });

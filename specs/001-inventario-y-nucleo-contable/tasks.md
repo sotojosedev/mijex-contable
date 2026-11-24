@@ -42,8 +42,9 @@
 - [x] T16 IR-17 en la librería (R-DO-206, REF-DO-006):
   - `withholdingsOfPeriod` calcula el movimiento neto del mes en las cuentas de retención del plan.
   - `buildIr17Summary` fija el vencimiento el día 10 del mes siguiente.
-  - El ITBIS retenido se informa sin plazo: la Norma 02-05 art. 10 remite a los plazos y formas del Código Tributario
-    (REF-DO-039); el formulario sigue [verificar] (falta el instructivo del IT-1).
+  - ITBIS retenido, resuelto el 2026-11-24: se declara «como impuesto retenido a terceros» en la declaración jurada
+    mensual del ITBIS, a más tardar el día 20 (Decreto 293-11 arts. 24 y 25 párr. III, REF-DO-011; lectura conjunta,
+    nivel B). `itbisWithheldDueDate` en el resumen.
   - Resuelto el 2026-11-24: si el día 10 es fin de semana o feriado, vence el siguiente día laborable (REF-DO-037,
     Calendario del Contribuyente 2026). Los feriados llegan como dato (`holidays`), sin lista en el código.
   - Hallazgo: la Norma General 02-2026 (REF-DO-038) quita la retención de la Norma 02-05 entre sociedades cuando el

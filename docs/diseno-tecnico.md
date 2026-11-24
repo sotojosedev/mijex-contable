@@ -141,7 +141,6 @@ Registro de operaciones y catálogo fiscal (spec 003):
 | Staging y producción (001 T12c, 005 T060) | Parado: MIJEX solo en desarrollo (dueño, 2026-11-22). | Dueño |
 | Publicar la versión mayor de esta librería y fiscal-core 0.5.0 | Pendiente; hasta entonces, enlaces `file:`. | Dueño |
 | Multiempresa: entidades contables de organizaciones y comunidades (Clarify Q1 de la 001) | Sin empezar; necesita fuentes oficiales. | Dueño |
-| IR-17 (R-DO-206): formulario del ITBIS retenido | `[verificar]`: falta el instructivo del IT-1 (la prórroga quedó resuelta el 2026-11-24). | Dueño / DGII |
 | Norma General 02-2026 (REF-DO-038): sin retención de la 02-05 entre sociedades con e-CF | Afecta a R-DO-005; se decide en fiscal-core. | Dueño (fiscal-core) |
 | Spec 062 de Property (R-CORE-016 y R-CORE-017) | Reglas creadas; implementación pendiente en Property (la migración E necesita aprobación). | Dueño |
 | `lint` y `knip` señalan los skills de terceros de `.agents/` | Deuda conocida (`sdd/memory.md`). | — |
@@ -204,3 +203,4 @@ Registro de operaciones y catálogo fiscal (spec 003):
 | 2026-11-24 | §6 al día (HS y Property ya integrados; lo que se reutiliza de fiscal-core) y §7 con las decisiones abiertas. Borrada la copia antigua `skills-lock 2.json`. | — | §6, §7 |
 | 2026-11-24 | 001 T12b cerrada en desarrollo: `CONTABLE_ENABLED=1` en HS y migraciones 0001–0008 con huella idéntica en `mijex_contingencia_dev` y `mijex_property`. Staging y producción pasan a T12c (parada). | 001 | §7 |
 | 2026-11-24 | R-DO-206: el IR-17 vence el siguiente día laborable si el día 10 es fin de semana o feriado (REF-DO-037, Calendario del Contribuyente 2026); `buildIr17Summary` acepta `holidays` (MINOR). Referencias REF-DO-038 (Norma 02-2026) y REF-DO-039 (Norma 02-05) con copias. | 001 | §7 |
+| 2026-11-24 | R-DO-206: el ITBIS retenido vence con la declaración jurada mensual del ITBIS, el día 20 o el siguiente laborable (Decreto 293-11 arts. 24 y 25 párr. III); `Ir17Summary.itbisWithheldDueDate` (MINOR). Sin `[verificar]` en el IR-17. | 001 | §7 |
