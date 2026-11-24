@@ -141,7 +141,8 @@ Registro de operaciones y catálogo fiscal (spec 003):
 | Staging y producción (001 T12c, 005 T060) | Parado: MIJEX solo en desarrollo (dueño, 2026-11-22). | Dueño |
 | Publicar la versión mayor de esta librería y fiscal-core 0.5.0 | Pendiente; hasta entonces, enlaces `file:`. | Dueño |
 | Multiempresa: entidades contables de organizaciones y comunidades (Clarify Q1 de la 001) | Sin empezar; necesita fuentes oficiales. | Dueño |
-| IR-17 (R-DO-206): formulario y plazo del ITBIS retenido; prórroga por fin de semana o feriado | `[verificar]` con la DGII. | Dueño / DGII |
+| IR-17 (R-DO-206): formulario del ITBIS retenido | `[verificar]`: falta el instructivo del IT-1 (la prórroga quedó resuelta el 2026-11-24). | Dueño / DGII |
+| Norma General 02-2026 (REF-DO-038): sin retención de la 02-05 entre sociedades con e-CF | Afecta a R-DO-005; se decide en fiscal-core. | Dueño (fiscal-core) |
 | Spec 062 de Property (R-CORE-016 y R-CORE-017) | Reglas creadas; implementación pendiente en Property (la migración E necesita aprobación). | Dueño |
 | `lint` y `knip` señalan los skills de terceros de `.agents/` | Deuda conocida (`sdd/memory.md`). | — |
 
@@ -202,3 +203,4 @@ Registro de operaciones y catálogo fiscal (spec 003):
 | 2026-11-23 | Spec 005 (K12, REF-DEC-016) · **cambio incompatible** (MAJOR): se retiran el catálogo fiscal y la decisión de emisión (`createFiscalRuleCatalog`, `createMemoryFiscalRuleStore`, `createPgFiscalRuleStore`, `decideFiscalIssuance` y sus tipos; códigos `SELF_VERIFICATION` y `STALE_PROPOSAL`). Viven en `@mijex/fiscal-core` (spec 014: propuesta, verificación y publicación por tres personas; referencia de la regla en cada documento). Ningún consumidor los usaba (búsqueda en todos los repositorios; compilación de Property y HS). Migración **0008**: elimina `contable.fiscal_rule` (vacía en todas las bases; sin dependencias externas) y aborta si tuviera filas; aplicada en `mijex_property` y `mijex_contingencia_dev` con copia previa. `FiscalResultEnvelope` gana `ruleRefs` opcional (R-CORE-018, código `FISCAL_RULE_REF`); Property lo rellena con las referencias de fiscal-core. Cierra I-K12-2 en esta librería. Pendiente del dueño: staging/producción y publicación de la versión mayor. | 005 | §4, §5 |
 | 2026-11-24 | §6 al día (HS y Property ya integrados; lo que se reutiliza de fiscal-core) y §7 con las decisiones abiertas. Borrada la copia antigua `skills-lock 2.json`. | — | §6, §7 |
 | 2026-11-24 | 001 T12b cerrada en desarrollo: `CONTABLE_ENABLED=1` en HS y migraciones 0001–0008 con huella idéntica en `mijex_contingencia_dev` y `mijex_property`. Staging y producción pasan a T12c (parada). | 001 | §7 |
+| 2026-11-24 | R-DO-206: el IR-17 vence el siguiente día laborable si el día 10 es fin de semana o feriado (REF-DO-037, Calendario del Contribuyente 2026); `buildIr17Summary` acepta `holidays` (MINOR). Referencias REF-DO-038 (Norma 02-2026) y REF-DO-039 (Norma 02-05) con copias. | 001 | §7 |

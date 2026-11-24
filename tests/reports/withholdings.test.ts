@@ -31,7 +31,31 @@ describe("[R-DO-206] IR-17: retenciones de ISR del mes, a más tardar el día 10
       period: "202611", isrWithheld: 1_500n, dueDate: "2026-12-10", itbisWithheld: 18_000n,
       notes: [expect.stringContaining("IR-17"), expect.stringContaining("[verificar]")],
     });
-    expect(buildIr17Summary({ period: "202612", isrWithheld: 0n, itbisWithheld: 0n }).dueDate).toBe("2027-01-10");
+    expect(buildIr17Summary({ period: "202601", isrWithheld: 0n, itbisWithheld: 0n }).dueDate).toBe("2026-02-10");
     expect(() => buildIr17Summary({ period: "2026-11", isrWithheld: 0n, itbisWithheld: 0n })).toThrow();
+  });
+
+  // REF-DO-037: fechas del Calendario del Contribuyente 2026 de la DGII.
+  it("si el día 10 cae en sábado o domingo, vence el siguiente día laborable (calendario DGII 2026)", () => {
+    const due = (period: string) => buildIr17Summary({ period, isrWithheld: 0n, itbisWithheld: 0n }).dueDate;
+    expect(due("202512")).toBe("2026-01-12"); // sábado 10 → lunes 12
+    expect(due("202604")).toBe("2026-05-11"); // domingo 10 → lunes 11
+    expect(due("202609")).toBe("2026-10-12"); // sábado 10 → lunes 12
+    expect(due("202612")).toBe("2027-01-11"); // domingo 10 → lunes 11
+  });
+
+  it("salta los feriados que se le dan como dato, sin lista fija en el código", () => {
+    const base = { period: "202602", isrWithheld: 0n, itbisWithheld: 0n } as const;
+    expect(buildIr17Summary(base).dueDate).toBe("2026-03-10");
+    expect(buildIr17Summary({ ...base, holidays: ["2026-03-10"] }).dueDate).toBe("2026-03-11");
+    // Feriado el lunes siguiente a un fin de semana: sábado 10 → lunes 12 (feriado) → martes 13.
+    expect(buildIr17Summary({ period: "202609", isrWithheld: 0n, itbisWithheld: 0n, holidays: ["2026-10-12"] }).dueDate).toBe("2026-10-13");
+    expect(() => buildIr17Summary({ ...base, holidays: ["2026-3-10"] })).toThrow(RangeError);
+  });
+
+  it("el ITBIS retenido sigue sin formulario ni plazo propios; la nota cita la norma 02-05 art. 10 (REF-DO-039)", () => {
+    const { notes } = buildIr17Summary({ period: "202611", isrWithheld: 0n, itbisWithheld: 1n });
+    expect(notes.some((n) => n.includes("feriado") && !n.includes("[verificar]"))).toBe(true);
+    expect(notes.some((n) => n.includes("ITBIS retenido") && n.includes("[verificar]") && n.includes("02-05"))).toBe(true);
   });
 });

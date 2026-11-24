@@ -42,7 +42,12 @@
 - [x] T16 IR-17 en la librería (R-DO-206, REF-DO-006):
   - `withholdingsOfPeriod` calcula el movimiento neto del mes en las cuentas de retención del plan.
   - `buildIr17Summary` fija el vencimiento el día 10 del mes siguiente.
-  - El ITBIS retenido se informa sin plazo: [verificar] su formulario y plazo, que la página oficial no indica. También [verificar] la prórroga por fin de semana o feriado.
+  - El ITBIS retenido se informa sin plazo: la Norma 02-05 art. 10 remite a los plazos y formas del Código Tributario
+    (REF-DO-039); el formulario sigue [verificar] (falta el instructivo del IT-1).
+  - Resuelto el 2026-11-24: si el día 10 es fin de semana o feriado, vence el siguiente día laborable (REF-DO-037,
+    Calendario del Contribuyente 2026). Los feriados llegan como dato (`holidays`), sin lista en el código.
+  - Hallazgo: la Norma General 02-2026 (REF-DO-038) quita la retención de la Norma 02-05 entre sociedades cuando el
+    proveedor factura con e-CF. Afecta a R-DO-005 y se resuelve en fiscal-core, no aquí.
   - HS lo consume en lugar de su `ir17Summary`.
 
 ## Siguientes

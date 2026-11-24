@@ -2,8 +2,10 @@ import type { Ledger } from "../../core/ledger.js";
 import type { CivilDate, Minor } from "../../core/types.js";
 
 // R-DO-206: retenciones del mes para el IR-17 (REF-DO-006, página ISR de la DGII: «a más tardar los
-// días 10 del mes siguiente al periodo declarado»). El ITBIS retenido se informa, pero la página
-// oficial no dice en qué formulario ni con qué plazo se declara: queda [verificar] y sin fecha.
+// días 10 del mes siguiente al periodo declarado»). Si ese día no es laborable, vence el siguiente día
+// laborable (REF-DO-037, Calendario del Contribuyente 2026). Los feriados son dato del llamador, nunca
+// una lista fija aquí. El ITBIS retenido se informa sin fecha: la Norma General 02-05 art. 10 remite
+// a «los plazos y formas establecidos en el Código Tributario» (REF-DO-039) y el formulario sigue [verificar].
 
 const PERIOD = /^(\d{4})(0[1-9]|1[0-2])$/;
 
@@ -41,23 +43,45 @@ export async function withholdingsOfPeriod(ledger: Ledger, entityId: string, acc
 export interface Ir17Summary {
   readonly period: string;
   readonly isrWithheld: Minor;
-  /** Día 10 del mes siguiente (REF-DO-006). Si cae en fin de semana o feriado: [verificar]. */
+  /** Día 10 del mes siguiente (REF-DO-006) o, si no es laborable, el siguiente día laborable (REF-DO-037). */
   readonly dueDate: CivilDate;
   readonly itbisWithheld: Minor;
   readonly notes: readonly string[];
 }
 
-export function buildIr17Summary(input: { readonly period: string; readonly isrWithheld: Minor; readonly itbisWithheld: Minor }): Ir17Summary {
+const CIVIL = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+/** Primer día desde `date` que no es sábado, domingo ni feriado. */
+function nextWorkingDay(year: number, month: number, day: number, holidays: ReadonlySet<CivilDate>): CivilDate {
+  const d = new Date(Date.UTC(year, month - 1, day));
+  for (;;) {
+    const date = civil(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+    const weekday = d.getUTCDay();
+    if (weekday !== 0 && weekday !== 6 && !holidays.has(date)) return date;
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+}
+
+export function buildIr17Summary(input: {
+  readonly period: string;
+  readonly isrWithheld: Minor;
+  readonly itbisWithheld: Minor;
+  /** Feriados oficiales de RD (AAAA-MM-DD), p. ej. los del Calendario del Contribuyente de la DGII. */
+  readonly holidays?: readonly CivilDate[];
+}): Ir17Summary {
   const { year, month } = parsePeriod(input.period);
+  const holidays = input.holidays ?? [];
+  const invalid = holidays.find((h) => !CIVIL.test(h));
+  if (invalid !== undefined) throw new RangeError(`Feriado no válido (AAAA-MM-DD): ${invalid}`);
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 };
   return {
     period: input.period,
     isrWithheld: input.isrWithheld,
-    dueDate: civil(next.year, next.month, 10),
+    dueDate: nextWorkingDay(next.year, next.month, 10, new Set(holidays)),
     itbisWithheld: input.itbisWithheld,
     notes: [
-      "Retenciones de ISR: IR-17, a más tardar el día 10 del mes siguiente (DGII, Impuesto sobre la Renta). Si cae en fin de semana o feriado, [verificar] la prórroga.",
-      "ITBIS retenido: [verificar] formulario y plazo; la página oficial del ITBIS no lo indica (el ITBIS mensual vence el día 20).",
+      "Retenciones de ISR: IR-17, a más tardar el día 10 del mes siguiente; si es fin de semana o feriado, el siguiente día laborable (DGII, Impuesto sobre la Renta y Calendario del Contribuyente).",
+      "ITBIS retenido: la Norma General 02-05 art. 10 remite a los plazos y formas del Código Tributario; [verificar] el formulario y el plazo (el ITBIS mensual vence el día 20).",
     ],
   };
 }
